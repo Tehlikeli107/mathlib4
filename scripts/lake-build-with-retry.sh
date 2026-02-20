@@ -30,7 +30,9 @@ while true; do
   counter=$((counter + 1))
 
   echo "**** start of lake build: attempt $counter"
-  LEAN_ABORT_ON_PANIC=1 "${SCRIPTS_DIR}/lake-build-wrapper.py" ".lake/build_summary_${TARGET_NAME}.json" lake build --wfail -KCI "$TARGET_NAME"
+  # Replace / and \ with _ to avoid path traversal or subdirectory issues in the summary filename
+  SAFE_TARGET_NAME=$(echo "$TARGET_NAME" | tr '/\\' '_')
+  LEAN_ABORT_ON_PANIC=1 "${SCRIPTS_DIR}/lake-build-wrapper.py" ".lake/build_summary_${SAFE_TARGET_NAME}.json" lake build --wfail -KCI "$TARGET_NAME"
   echo "**** end of lake build: attempt $counter"
 
   echo "::group::lake build --no-build: attempt $counter"
