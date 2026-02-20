@@ -4,3 +4,4 @@
 .cache
 # `lake` stores its files here:
 .lake
+benchmark_log.txt

@@ -74,6 +74,12 @@ class BuildOutputProcessor:
         self.infos = []
         self.current_block = []
         self.group_open = False
+
+        # Pre-compile regexes for performance
+        self.progress_regex = re.compile(r'\[(\d+)/(\d+)\]')
+        self.file_info_regex = re.compile(r'\[(\d+)/(\d+)\]\s+(\S+)\s+([^\s]+)')
+        self.dot_regex = re.compile(r'\.')
+
         class _State(Enum):
             OUTSIDE = auto()
             GROUP_OPEN = auto()  # progress (✔) group is open
@@ -110,8 +116,8 @@ class BuildOutputProcessor:
 
         Precondition: no group is currently open (caller closed it if necessary).
         """
-        stripped = line.strip()
-        first_match = re.search(r'\[(\d+)/(\d+)\]', stripped)
+        # Avoid full strip if not needed, regex search handles surrounding text
+        first_match = self.progress_regex.search(line)
         if first_match:
             group_name = f"Build progress [starting at {first_match.group(1)}/{first_match.group(2)}]"
         else:
@@ -144,11 +150,12 @@ class BuildOutputProcessor:
 
     def is_normal_line(self, line: str) -> bool:
         """Check if line is normal build output (checkmark)."""
-        return line.strip().startswith('✔')
+        # Use lstrip to avoid allocating new string for full strip
+        return line.lstrip().startswith('✔')
 
     def detect_block_kind(self, line: str):
         """Return the BlockKind if the line starts a block; otherwise None."""
-        stripped = line.strip()
+        stripped = line.lstrip()
         if stripped.startswith('⚠'):
             return self.BlockKind.WARNING
         if stripped.startswith('✖'):
@@ -159,7 +166,7 @@ class BuildOutputProcessor:
 
     def is_build_summary(self, line: str) -> bool:
         """Check if line is a build summary (end of build output)"""
-        stripped = line.strip()
+        stripped = line.lstrip()
         return (stripped.startswith('error: build failed') or
                 stripped.startswith('Build completed successfully') or
                 stripped.startswith('Some required targets logged failures:') or
@@ -176,7 +183,7 @@ class BuildOutputProcessor:
         If the target contains a colon (e.g. batteries:extraDep), it is treated
         as a non-file target and no filename is generated.
         """
-        match = re.search(r'\[(\d+)/(\d+)\]\s+(\S+)\s+([^\s]+)', line)
+        match = self.file_info_regex.search(line)
         if not match:
             return {}
 
@@ -186,7 +193,7 @@ class BuildOutputProcessor:
             file_path = None
         else:
             # Single regex replacement: dots → slashes, then append .lean
-            file_path = re.sub(r'\.', '/', target) + '.lean'
+            file_path = self.dot_regex.sub('/', target) + '.lean'
 
         return {
             'current': int(match.group(1)),
