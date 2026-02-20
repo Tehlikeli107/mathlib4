@@ -48,6 +48,10 @@ def residueField (x : X) : CommRingCat :=
 instance (x : X) : Field (X.residueField x) :=
   inferInstanceAs <| Field (IsLocalRing.ResidueField (X.presheaf.stalk x))
 
+/-- The canonical map from the stalk of `X` at `x` to the residue field of `X` at `x`. -/
+def residue (x : X) : CommRingCat.of (X.presheaf.stalk x) ⟶ X.residueField x :=
+  CommRingCat.ofHom (IsLocalRing.residue (X.presheaf.stalk x))
+
 /--
 If `U` is an open of `X` containing `x`, we have a canonical ring map from the sections
 over `U` to the residue field of `x`.
@@ -56,9 +60,7 @@ If we interpret sections over `U` as functions of `X` defined on `U`, then this 
 corresponds to evaluation at `x`.
 -/
 def evaluation (x : U) : X.presheaf.obj (op U) ⟶ X.residueField x :=
-  -- TODO: make a new definition wrapping
-  -- `CommRingCat.ofHom (IsLocalRing.residue (X.presheaf.stalk _))`?
-  X.presheaf.germ U x.1 x.2 ≫ CommRingCat.ofHom (IsLocalRing.residue (X.presheaf.stalk _))
+  X.presheaf.germ U x.1 x.2 ≫ X.residue x
 
 /-- The global evaluation map from `Γ(X, ⊤)` to the residue field at `x`. -/
 def Γevaluation (x : X) : X.presheaf.obj (op ⊤) ⟶ X.residueField x :=
@@ -99,10 +101,8 @@ def residueFieldMap (x : X) : Y.residueField (f.base x) ⟶ X.residueField x :=
   CommRingCat.ofHom (IsLocalRing.ResidueField.map (f.stalkMap x).hom)
 
 lemma residue_comp_residueFieldMap_eq_stalkMap_comp_residue (x : X) :
-    CommRingCat.ofHom (IsLocalRing.residue (Y.presheaf.stalk (f.base x))) ≫
-      residueFieldMap f x = f.stalkMap x ≫
-      CommRingCat.ofHom (IsLocalRing.residue (X.presheaf.stalk x)) := by
-  simp [residueFieldMap]
+    Y.residue (f.base x) ≫ residueFieldMap f x = f.stalkMap x ≫ X.residue x := by
+  simp [residueFieldMap, residue]
   rfl
 
 @[simp]
@@ -123,7 +123,7 @@ lemma residueFieldMap_comp {Z : LocallyRingedSpace.{u}} (g : Y ⟶ Z) (x : X) :
 lemma evaluation_naturality {V : Opens Y} (x : (Opens.map f.base).obj V) :
     Y.evaluation ⟨f.base x, x.property⟩ ≫ residueFieldMap f x.val =
       f.c.app (op V) ≫ X.evaluation x := by
-  dsimp only [LocallyRingedSpace.evaluation,
+  dsimp only [LocallyRingedSpace.evaluation, LocallyRingedSpace.residue,
     LocallyRingedSpace.residueFieldMap]
   rw [Category.assoc]
   ext a
