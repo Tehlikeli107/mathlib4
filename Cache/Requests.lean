@@ -667,21 +667,36 @@ Retrieves metadata about hosted files: their names and the timestamps of last mo
 Example: `["f/39476538726384726.tar.gz", "Sat, 24 Dec 2022 17:33:01 GMT"]`
 -/
 def getFilesInfo (q : QueryType) : IO <| List (String × String) := do
-  if useCloudflareCache then
-    throw <| .userError "FIXME: getFilesInfo is not adapted to Cloudflare cache yet"
   IO.println s!"Downloading info list of {q.desc}"
-  let ret ← IO.runCurl #["-X", "GET", s!"{URL}?comp=list&restype=container{q.prefix}"]
-  match ret.splitOn "<Name>" with
-  | [] => formatError
-  | [_] => return []
-  | _ :: parts =>
-    parts.mapM fun part => match part.splitOn "</Name>" with
-      | [name, rest] => match rest.splitOn "<Last-Modified>" with
-        | [_, rest] => match rest.splitOn "</Last-Modified>" with
-          | [date, _] => pure (name, date)
+  if useCloudflareCache then
+    let token ← getToken
+    -- Use UPLOAD_URL for Cloudflare, as the public URL does not support listing
+    let ret ← IO.runCurl #["--aws-sigv4", "aws:amz:auto:s3", "--user", token, "-X", "GET",
+      s!"{UPLOAD_URL}/?list-type=2{q.prefix}"]
+    match ret.splitOn "<Key>" with
+    | [] => formatError
+    | [_] => return []
+    | _ :: parts =>
+      parts.mapM fun part => match part.splitOn "</Key>" with
+        | [name, rest] => match rest.splitOn "<LastModified>" with
+          | [_, rest] => match rest.splitOn "</LastModified>" with
+            | [date, _] => pure (name, date)
+            | _ => formatError
           | _ => formatError
         | _ => formatError
-      | _ => formatError
+  else
+    let ret ← IO.runCurl #["-X", "GET", s!"{URL}?comp=list&restype=container{q.prefix}"]
+    match ret.splitOn "<Name>" with
+    | [] => formatError
+    | [_] => return []
+    | _ :: parts =>
+      parts.mapM fun part => match part.splitOn "</Name>" with
+        | [name, rest] => match rest.splitOn "<Last-Modified>" with
+          | [_, rest] => match rest.splitOn "</Last-Modified>" with
+            | [date, _] => pure (name, date)
+            | _ => formatError
+          | _ => formatError
+        | _ => formatError
 
 end Collect
 
