@@ -599,14 +599,17 @@ abbrev closureCommRingOfComm {s : Set R} (hcomm : ∀ x ∈ s, ∀ y ∈ s, x * 
       Subtype.ext <| Set.centralizer_centralizer_comm_of_comm hcomm _ (this h₁) _ (this h₂) }
 
 -- TODO: find a good way to fix the non-terminal simp
-set_option linter.flexible false in
 theorem exists_list_of_mem_closure {s : Set R} {x : R} (hx : x ∈ closure s) :
     ∃ L : List (List R), (∀ t ∈ L, ∀ y ∈ t, y ∈ s ∨ y = (-1 : R)) ∧ (L.map List.prod).sum = x := by
   rw [mem_closure_iff] at hx
   induction hx using AddSubgroup.closure_induction with
   | mem _ hx =>
     obtain ⟨l, hl, h⟩ := Submonoid.exists_list_of_mem_closure hx
-    exact ⟨[l], by simp [h]; clear_aux_decl; tauto⟩
+    refine ⟨[l], ?_, by simp [h]⟩
+    intro t ht y hy
+    simp only [List.mem_singleton] at ht
+    subst ht
+    exact Or.inl (hl y hy)
   | zero => exact ⟨[], List.forall_mem_nil _, rfl⟩
   | add _ _ _ _ hL hM =>
     obtain ⟨⟨L, HL1, HL2⟩, ⟨M, HM1, HM2⟩⟩ := And.intro hL hM
@@ -617,8 +620,9 @@ theorem exists_list_of_mem_closure {s : Set R} {x : R} (hx : x ∈ closure s) :
     exact ⟨L.map (List.cons (-1)),
       List.forall_mem_map.2 fun j hj => List.forall_mem_cons.2 ⟨Or.inr rfl, hL.1 j hj⟩,
       hL.2 ▸
-        List.recOn L (by simp)
-          (by simp +contextual [List.map_cons, add_comm])⟩
+        List.recOn L (by simp only [List.map_nil, List.sum_nil, neg_zero])
+          (fun hd tl ih => by simp only [List.map_cons, List.sum_cons, List.prod_cons,
+            neg_one_mul, neg_add, add_comm, ih])⟩
 
 variable (R) in
 /-- `closure` forms a Galois insertion with the coercion to set. -/
