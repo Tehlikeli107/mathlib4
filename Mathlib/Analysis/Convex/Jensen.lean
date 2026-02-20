@@ -8,6 +8,7 @@ module
 public import Mathlib.Analysis.Convex.Combination
 public import Mathlib.Analysis.Convex.Function
 public import Mathlib.Tactic.FieldSimp
+public import Mathlib.Tactic.RSuffices
 
 /-!
 # Jensen's inequality and maximum principle for convex functions
@@ -273,15 +274,14 @@ lemma ConvexOn.exists_ge_of_centerMass {t : Finset ι} (h : ConvexOn 𝕜 s f)
     (hw₀ : ∀ i ∈ t, 0 ≤ w i) (hw₁ : 0 < ∑ i ∈ t, w i) (hp : ∀ i ∈ t, p i ∈ s) :
     ∃ i ∈ t, f (t.centerMass w p) ≤ f (p i) := by
   set y := t.centerMass w p
-  -- TODO: can `rsuffices` be used to write the `exact` first, then the proof of this obtain?
-  obtain ⟨i, hi, hfi⟩ : ∃ i ∈ {i ∈ t | w i ≠ 0}, w i • f y ≤ w i • (f ∘ p) i := by
-    have hw' : (0 : 𝕜) < ∑ i ∈ t with w i ≠ 0, w i := by rwa [sum_filter_ne_zero]
+  rsuffices ⟨i, hi, hfi⟩ : ∃ i ∈ {i ∈ t | w i ≠ 0}, w i • f y ≤ w i • (f ∘ p) i
+  · rw [mem_filter] at hi
+    exact ⟨i, hi.1, (smul_le_smul_iff_of_pos_left <| (hw₀ i hi.1).lt_of_ne hi.2.symm).1 hfi⟩
+  · have hw' : (0 : 𝕜) < ∑ i ∈ t with w i ≠ 0, w i := by rwa [sum_filter_ne_zero]
     refine exists_le_of_sum_le (nonempty_of_sum_ne_zero hw'.ne') ?_
     rw [← sum_smul, ← smul_le_smul_iff_of_pos_left (inv_pos.2 hw'), inv_smul_smul₀ hw'.ne', ←
       centerMass, centerMass_filter_ne_zero]
     exact h.map_centerMass_le hw₀ hw₁ hp
-  rw [mem_filter] at hi
-  exact ⟨i, hi.1, (smul_le_smul_iff_of_pos_left <| (hw₀ i hi.1).lt_of_ne hi.2.symm).1 hfi⟩
 
 set_option backward.isDefEq.respectTransparency false in
 /-- If a function `f` is concave on `s`, then the value it takes at some center of mass of points of
