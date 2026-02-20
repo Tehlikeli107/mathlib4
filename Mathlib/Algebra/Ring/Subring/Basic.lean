@@ -7,6 +7,7 @@ module
 
 public import Mathlib.Algebra.Field.Defs
 public import Mathlib.Algebra.Group.Subgroup.Basic
+public import Mathlib.Algebra.Ring.Center
 public import Mathlib.Algebra.Ring.Subring.Defs
 public import Mathlib.Algebra.Ring.Subsemiring.Basic
 public import Mathlib.RingTheory.NonUnitalSubring.Defs
@@ -414,17 +415,36 @@ section DivisionRing
 
 variable {K : Type u} [DivisionRing K]
 
+namespace Set
+
+theorem ratCast_mem_center (q : ℚ) : (q : K) ∈ center K := by
+  rw [Rat.cast_def, div_eq_mul_inv]
+  refine mul_mem_center (intCast_mem_center _ _) (inv_mem_center (natCast_mem_center _ _))
+
+theorem qsmul_mem_center (q : ℚ) {a : K} (ha : a ∈ center K) : q • a ∈ center K := by
+  rw [Rat.smul_def]
+  exact mul_mem_center (ratCast_mem_center q) ha
+
+theorem nnratCast_mem_center (q : ℚ≥0) : (q : K) ∈ center K := by
+  rw [NNRat.cast_def, div_eq_mul_inv]
+  refine mul_mem_center (natCast_mem_center _ _) (inv_mem_center (natCast_mem_center _ _))
+
+theorem nnqsmul_mem_center (q : ℚ≥0) {a : K} (ha : a ∈ center K) : q • a ∈ center K := by
+  rw [NNRat.smul_def]
+  exact mul_mem_center (nnratCast_mem_center q) ha
+
+end Set
+
 instance instField : Field (center K) where
   inv a := ⟨a⁻¹, Set.inv_mem_center a.prop⟩
   mul_inv_cancel _ ha := Subtype.ext <| mul_inv_cancel₀ <| Subtype.coe_injective.ne ha
   div a b := ⟨a / b, Set.div_mem_center a.prop b.prop⟩
   div_eq_mul_inv _ _ := Subtype.ext <| div_eq_mul_inv _ _
   inv_zero := Subtype.ext inv_zero
-  -- TODO: use a nicer defeq
-  nnqsmul := _
-  nnqsmul_def := fun _ _ => rfl
-  qsmul := _
-  qsmul_def := fun _ _ => rfl
+  nnqsmul q a := ⟨q • (a : K), Set.nnqsmul_mem_center q a.prop⟩
+  nnqsmul_def q a := Subtype.ext <| NNRat.smul_def q a
+  qsmul q a := ⟨q • (a : K), Set.qsmul_mem_center q a.prop⟩
+  qsmul_def q a := Subtype.ext <| Rat.smul_def q a
 
 @[simp]
 theorem center.coe_inv (a : center K) : ((a⁻¹ : center K) : K) = (a : K)⁻¹ :=
