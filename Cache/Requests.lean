@@ -5,6 +5,7 @@ Authors: Arthur Paulino
 -/
 
 import Batteries.Data.String.Matcher
+import Std.Data.HashSet
 import Cache.Hashing
 import Cache.Init
 
@@ -527,6 +528,13 @@ initialize UPLOAD_URL : String ← do
       "https://lakecache.blob.core.windows.net/mathlib4"
   return url?.getD defaultUrl
 
+/-- Formats the config file for `curl`, containing the list of files to be checked -/
+def mkHeadConfigContent (repo : String) (files : Array FilePath) (token : String) : IO String := do
+  let token := if useCloudflareCache then "" else s!"?{token}"
+  let l := files.toList.map fun file =>
+    s!"url = {mkFileURL repo UPLOAD_URL file.fileName.get!}{token}"
+  return "\n".intercalate l
+
 /-- Formats the config file for `curl`, containing the list of files to be uploaded -/
 def mkPutConfigContent (repo : String) (files : Array FilePath) (token : String) : IO String := do
   let token := if useCloudflareCache then "" else s!"?{token}" -- the Cloudflare cache doesn't pass the token here
@@ -534,19 +542,68 @@ def mkPutConfigContent (repo : String) (files : Array FilePath) (token : String)
     pure s!"-T {file.toString}\nurl = {mkFileURL repo UPLOAD_URL file.fileName.get!}{token}"
   return "\n".intercalate l
 
+/--
+Check if files exist on the server using HEAD requests.
+Returns the set of filenames that *do* exist.
+-/
+def checkFilesExist (repo : String) (files : Array FilePath) (token : String) : IO (Std.HashSet String) := do
+  let size := files.size
+  if size == 0 then return ∅
+
+  let configPath := IO.CACHEDIR / "head.cfg"
+  IO.FS.writeFile configPath (← mkHeadConfigContent repo files token)
+
+  try
+    let args := if useCloudflareCache then
+        #["--aws-sigv4", "aws:amz:auto:s3", "--user", token]
+      else
+        #[]
+
+    let args := args ++ #[
+      "-X", "HEAD", "--parallel",
+      "--retry", "5",
+      "--write-out", "%{json}\n", "--config", configPath.toString]
+
+    let init : Std.HashSet String := ∅
+    let existingFiles ← Cache.IO.runCurlStreaming args init fun acc line => do
+      let line := line.trimAscii
+      if !line.isEmpty then
+         match Lean.Json.parse line.copy with
+         | .ok result =>
+           match result.getObjValAs? Nat "http_code" with
+           | .ok 200 =>
+             if let .ok url := result.getObjValAs? String "url_effective" then
+               let urlWithoutQuery := url.splitOn "?" |>.head!
+               let fileName := urlWithoutQuery.splitOn "/" |>.getLast!
+               return acc.insert fileName
+             else
+               return acc
+           | _ => return acc
+         | .error _ => return acc
+      else return acc
+    return existingFiles
+  finally
+    IO.FS.removeFile configPath
+
 /-- Calls `curl` to send a set of files to the server -/
 def putFilesAbsolute
   (repo : String) (files : Array FilePath) (tempConfigFilePath : FilePath)
   (overwrite : Bool) (token : String) : IO Unit := do
-  -- TODO: reimplement using HEAD requests?
-  let _ := overwrite
+  let originalSize := files.size
+  let files ← if !overwrite then
+    let existing ← checkFilesExist repo files token
+    let newFiles := files.filter fun f => !existing.contains f.fileName.get!
+    let skipped := originalSize - newFiles.size
+    if skipped > 0 then
+      IO.println s!"{skipped} files already exist on server, skipping upload."
+    pure newFiles
+  else
+    pure files
   let size := files.size
   if size > 0 then
     IO.FS.writeFile tempConfigFilePath (← mkPutConfigContent repo files token)
     IO.println s!"Attempting to upload {size} file(s) to {repo} cache"
     let args := if useCloudflareCache then
-      -- TODO: reimplement using HEAD requests?
-      let _ := overwrite
       #["--aws-sigv4", "aws:amz:auto:s3", "--user", token]
     else if overwrite then
       #["-H", "x-ms-blob-type: BlockBlob"]
@@ -564,7 +621,6 @@ def putFilesAbsolute
 def putFiles
   (repo : String) (fileNames : Array String)
   (overwrite : Bool) (token : String) : IO Unit := do
-  -- TODO: reimplement using HEAD requests?
   let files : Array FilePath := fileNames.map (fun (f : String) => (IO.CACHEDIR / f))
   putFilesAbsolute repo files IO.CURLCFG overwrite token
 end Put
