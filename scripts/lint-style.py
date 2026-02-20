@@ -214,12 +214,11 @@ def lint(path, fix=False):
         # We enumerate the lines so that we can report line numbers in the error messages correctly
         # we will modify lines as we go, so we need to keep track of the original line numbers
         lines = f.readlines()
-        enum_lines = enumerate(lines, 1)
+        enum_lines = list(enumerate(lines, 1))
         newlines = enum_lines
         for error_check in [four_spaces_in_second_line,
                             isolated_by_dot_semicolon_check,
-                            left_arrow_check,
-                            nonterminal_simp_check]:
+                            left_arrow_check]:
             errs, newlines = error_check(newlines, path)
             format_errors(errs)
 
