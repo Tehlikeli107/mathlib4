@@ -23,6 +23,9 @@ def compare_counts(base_file, head_file, changed_files_txt):
     with open(changed_files_txt, 'r') as f:
         changed_files = [line.strip() for line in f]
 
+    return compare_counts_from_data(base_counts, head_counts, changed_files)
+
+def compare_counts_from_data(base_counts, head_counts, changed_files):
     # Filter for .lean files, replace / with . in the path, and drop the .lean extension
     changed_files = [file.replace('/', '.').replace('.lean', '') for file in changed_files if file.endswith('.lean')]
 
