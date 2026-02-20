@@ -106,36 +106,49 @@ def annotate_strings(enumerate_lines):
 
 
 def four_spaces_in_second_line(lines, path):
-    # TODO: also fix the space for all lines before ":=", right now we only fix the line after
-    # the first line break
     errors = []
     # We never alter the first line, as it does not occur as next_line in the iteration over the
     # zipped lines below, hence we add it here
     newlines = [lines[0]]
     annotated_lines = list(annotate_comments(lines))
-    for (_, line, is_comment), (next_line_nr, next_line, _) in zip(annotated_lines,
+    in_def_head = False
+    for (_, line, is_comment), (next_line_nr, next_line, next_is_comment) in zip(annotated_lines,
                                                                    annotated_lines[1:]):
         # Check if the current line matches "(lemma|theorem) .* :"
         new_next_line = next_line
         if (not is_comment) and re.search(r"^(protected )?(def|lemma|theorem) (?!.*:=).*(where)?$",
                                           line):
+            in_def_head = True
+        elif (not is_comment) and ":=" in line:
+            in_def_head = False
+
+        if in_def_head and (not next_is_comment):
             # Calculate the number of spaces before the first non-space character in the next line
             stripped_next_line = next_line.lstrip()
             if not (next_line == '\n' or next_line.startswith("#") or stripped_next_line.startswith("--")):
                 num_spaces = len(next_line) - len(stripped_next_line)
-                # The match with "| " could potentially match with a different usage of the same
-                # symbol, e.g. some sort of norm. In that case a space is not necessary, so
-                # looking for "| " should be enough.
-                if stripped_next_line.startswith("| ") or line.endswith("where\n"):
-                    # Check and fix if the number of leading space is not 2
-                    if num_spaces != 2:
-                        errors += [(ERR_IND, next_line_nr, path)]
-                        new_next_line = ' ' * 2 + stripped_next_line
-                # Check and fix if the number of leading spaces is not 4
+
+                # Stop if we hit a new definition at column 0
+                if num_spaces == 0 and re.search(r"^(protected )?(def|lemma|theorem|instance|structure|inductive|class|example|abbrev|axiom|opaque|variable|universe|section|namespace|end|notation|infix|prefix|postfix|syntax|macro|attribute)", next_line):
+                    in_def_head = False
                 else:
-                    if num_spaces != 4:
-                        errors += [(ERR_IND, next_line_nr, path)]
-                        new_next_line = ' ' * 4 + stripped_next_line
+                    # The match with "| " could potentially match with a different usage of the same
+                    # symbol, e.g. some sort of norm. In that case a space is not necessary, so
+                    # looking for "| " should be enough.
+                    if stripped_next_line.startswith("| ") or line.rstrip().endswith("where"):
+                        # Check and fix if the number of leading space is not 2
+                        if num_spaces != 2:
+                            errors += [(ERR_IND, next_line_nr, path)]
+                            new_next_line = ' ' * 2 + stripped_next_line
+                    # Check and fix if the number of leading spaces is not 4
+                    else:
+                        if num_spaces != 4:
+                            errors += [(ERR_IND, next_line_nr, path)]
+                            new_next_line = ' ' * 4 + stripped_next_line
+
+            if ":=" in next_line:
+                in_def_head = False
+
         newlines.append((next_line_nr, new_next_line))
     return errors, newlines
 
@@ -214,12 +227,11 @@ def lint(path, fix=False):
         # We enumerate the lines so that we can report line numbers in the error messages correctly
         # we will modify lines as we go, so we need to keep track of the original line numbers
         lines = f.readlines()
-        enum_lines = enumerate(lines, 1)
+        enum_lines = list(enumerate(lines, 1))
         newlines = enum_lines
         for error_check in [four_spaces_in_second_line,
                             isolated_by_dot_semicolon_check,
-                            left_arrow_check,
-                            nonterminal_simp_check]:
+                            left_arrow_check]:
             errs, newlines = error_check(newlines, path)
             format_errors(errs)
 
