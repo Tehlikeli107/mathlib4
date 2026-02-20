@@ -7,6 +7,10 @@ if [ "$#" -ne 1 ]; then
 fi
 
 PR_NUMBER=$1
+if [[ ! "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+    echo "Error: PR number must be an integer"
+    exit 1
+fi
 BRANCH_NAME="lean-pr-testing-$PR_NUMBER"
 
 # Find the remote pointing to leanprover-community/mathlib4-nightly-testing
