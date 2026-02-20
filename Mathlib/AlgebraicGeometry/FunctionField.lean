@@ -79,10 +79,8 @@ theorem genericPoint_eq_of_isOpenImmersion {X Y : Scheme} (f : X ⟶ Y) [IsOpenI
   · exact ⟨_, trivial, Set.mem_range_self hX.2.some⟩
 
 noncomputable instance stalkFunctionFieldAlgebra [IrreducibleSpace X] (x : X) :
-    Algebra (X.presheaf.stalk x) X.functionField := by
-  -- TODO: can we write this normally after the refactor finishes?
-  apply RingHom.toAlgebra
-  exact (X.presheaf.stalkSpecializes ((genericPoint_spec X).specializes trivial)).hom
+    Algebra (X.presheaf.stalk x) X.functionField :=
+  RingHom.toAlgebra (X.presheaf.stalkSpecializes ((genericPoint_spec X).specializes trivial)).hom
 
 instance functionField_isScalarTower [IrreducibleSpace X] (U : X.Opens) (x : U)
     [Nonempty U] : IsScalarTower Γ(X, U) (X.presheaf.stalk x) X.functionField := by
@@ -93,8 +91,7 @@ instance functionField_isScalarTower [IrreducibleSpace X] (U : X.Opens) (x : U)
 
 noncomputable instance (R : CommRingCat.{u}) [IsDomain R] :
     Algebra R (Spec R).functionField :=
-  -- TODO: can we write this normally after the refactor finishes?
-  RingHom.toAlgebra <| by apply CommRingCat.Hom.hom; apply StructureSheaf.toStalk
+  RingHom.toAlgebra (StructureSheaf.toStalk (genericPoint (Spec R))).hom
 
 set_option backward.isDefEq.respectTransparency false in
 @[simp]
