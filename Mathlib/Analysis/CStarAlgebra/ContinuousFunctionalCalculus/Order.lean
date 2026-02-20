@@ -80,6 +80,125 @@ theorem cfcₙ_tsub {A : Type*} [TopologicalSpace A] [NonUnitalRing A] [PartialO
     exact continuous_subtype_val.comp_continuousOn <|
       ContinuousOn.comp ‹_› continuous_real_toNNReal.continuousOn <| ha'.image ▸ Set.mapsTo_image ..
 
+section QuasispectrumPermanence
+
+open Unitization
+
+lemma NonUnitalStarAlgEquiv.quasispectrum_eq {A B : Type*} [NonUnitalCStarAlgebra A]
+    [NonUnitalCStarAlgebra B] (e : A ≃⋆ₐ[ℂ] B) (a : A) :
+    quasispectrum ℂ (e a) = quasispectrum ℂ a := by
+  rw [quasispectrum_eq_spectrum_inr' ℂ ℂ, quasispectrum_eq_spectrum_inr' ℂ ℂ]
+  let E : Unitization ℂ A ≃⋆ₐ[ℂ] Unitization ℂ B :=
+  { starMap (e : A →⋆ₙₐ[ℂ] B) with
+    invFun := starMap (e.symm : B →⋆ₙₐ[ℂ] A)
+    left_inv := fun x ↦ by cases x; simp [starMap]
+    right_inv := fun x ↦ by cases x; simp [starMap] }
+  convert AlgEquiv.spectrum_eq E (inr a)
+  simp [E, starMap, inr]
+
+/-- The quasispectrum of an element in a closed non-unital star subalgebra is the same as its
+quasispectrum in the larger algebra. -/
+lemma NonUnitalStarSubalgebra.quasispectrum_eq {A : Type*} [NonUnitalCStarAlgebra A]
+    (S : NonUnitalStarSubalgebra ℂ A) [hS : IsClosed (S : Set A)] (x : S) :
+    quasispectrum ℂ x = quasispectrum ℂ (x : A) := by
+  let f : S →⋆ₙₐ[ℂ] A := NonUnitalStarSubalgebraClass.subtype S
+  let F : Unitization ℂ S →⋆ₐ[ℂ] Unitization ℂ A := starMap f
+  have hF_iso : Isometry F := by
+    let _ : CStarAlgebra (Unitization ℂ S) := inferInstance
+    let _ : CStarAlgebra (Unitization ℂ A) := inferInstance
+    refine AddMonoidHomClass.isometry_of_norm F fun u ↦ ?_
+    suffices ‖u‖ ^ 2 = ‖F u‖ ^ 2 by
+      rw [← sq_eq_sq₀ (norm_nonneg _) (norm_nonneg _)]
+      exact this.symm
+    rw [← CStarRing.norm_star_mul_self, ← CStarRing.norm_star_mul_self, ← map_star, ← map_mul]
+    suffices ∀ {y : Unitization ℂ S}, IsSelfAdjoint y → ‖y‖ = ‖F y‖ by
+      exact this (IsSelfAdjoint.star_mul_self u)
+    intro y hy
+    rw [← IsSelfAdjoint.toReal_spectralRadius_complex_eq_norm hy,
+      ← IsSelfAdjoint.toReal_spectralRadius_complex_eq_norm (hy.map F)]
+    congr 1
+    let A₀ := StarAlgebra.elemental ℂ y
+    have hy_mem : y ∈ A₀ := StarAlgebra.self_mem _ _
+    let B₀ := StarAlgebra.elemental ℂ (F y)
+    let φ : A₀ →⋆ₐ[ℂ] B₀ := (F.comp A₀.subtype).codRestrict B₀ fun z ↦ by
+      obtain ⟨z, hz⟩ := z
+      show F z ∈ B₀
+      induction hz using StarAlgebra.adjoin_induction with
+      | mem _ h => obtain rfl := h; exact StarAlgebra.self_mem _ _
+      | add _ _ _ _ h₁ h₂ => map_add F _ _ ▸ add_mem h₁ h₂
+      | mul _ _ _ _ h₁ h₂ => map_mul F _ _ ▸ mul_mem h₁ h₂
+      | smul _ _ _ h => map_smul F _ _ ▸ SMulMemClass.smul_mem _ h
+      | star _ _ h => map_star F _ ▸ star_mem h
+      | zero => map_zero F ▸ zero_mem _
+    have hφ_bij : Function.Bijective φ := by
+      refine ⟨fun x y h ↦ Subtype.val_injective (F.injective (Subtype.val_injective h)), ?_⟩
+      intro b
+      suffices b.val ∈ (F.comp A₀.subtype).range by
+        obtain ⟨x, hx⟩ := this
+        exact ⟨x, Subtype.ext hx⟩
+      have : StarAlgHom.range (F.comp A₀.subtype) = StarAlgebra.adjoin ℂ {F y} := by
+        rw [StarAlgHom.range_comp, StarAlgHom.range_subtype, StarAlgHom.map_adjoin, Set.image_singleton]
+      rw [this]
+      exact b.prop
+    let ψ : A₀ ≃⋆ₐ[ℂ] B₀ := StarAlgEquiv.ofBijective φ hφ_bij
+    rw [← StarSubalgebra.spectrum_eq (S := A₀) (a := ⟨y, StarAlgebra.self_mem _ _⟩)]
+    rw [← StarSubalgebra.spectrum_eq (S := B₀) (a := ⟨F y, StarAlgebra.self_mem _ _⟩)]
+    exact AlgEquiv.spectrum_eq ψ ⟨y, StarAlgebra.self_mem _ _⟩
+  have h_range_closed : IsClosed (F.range : Set (Unitization ℂ A)) :=
+    hF_iso.isClosedEmbedding.isClosed_range
+  let S' : StarSubalgebra ℂ (Unitization ℂ A) :=
+    { F.range with
+      toSubalgebra := F.range.toSubalgebra
+      star_mem' := F.range.star_mem' }
+  have : IsClosed (S' : Set (Unitization ℂ A)) := h_range_closed
+  rw [quasispectrum_eq_spectrum_inr' ℂ ℂ x, quasispectrum_eq_spectrum_inr' ℂ ℂ (x : A)]
+  have h_eq : spectrum ℂ (F (inr x)) = spectrum ℂ (F (inr x) : Unitization ℂ A) :=
+    (StarSubalgebra.spectrum_eq (S := S') (a := ⟨F (inr x), SetLike.mem_coe.2 <| AlgHom.mem_range_self _ _⟩)).symm
+  rw [← h_eq]
+  let e : Unitization ℂ S ≃⋆ₐ[ℂ] S' := StarAlgEquiv.ofInjective' F F.injective
+  convert AlgEquiv.spectrum_eq e (inr x)
+  ext
+  simp [e, F, starMap, inr]
+
+/-- An isometric star homomorphism between non-unital C⋆-algebras preserves the order. -/
+lemma NonUnitalStarAlgHom.map_le_map_iff {F A B : Type*} [NonUnitalCStarAlgebra A]
+    [NonUnitalCStarAlgebra B] [PartialOrder A] [StarOrderedRing A] [PartialOrder B]
+    [StarOrderedRing B] [FunLike F A B] [NonUnitalAlgHomClass F ℂ A B] [StarHomClass F A B]
+    (φ : F) (hφ : Isometry φ) {a b : A} (ha : IsSelfAdjoint a := by cfc_tac)
+    (hb : IsSelfAdjoint b := by cfc_tac) : φ a ≤ φ b ↔ a ≤ b := by
+  have : Function.Injective φ := hφ.injective
+  rw [← sub_nonneg, ← sub_nonneg (a := b), map_sub]
+  have ha' : IsSelfAdjoint (b - a) := hb.sub ha
+  have hφa' : IsSelfAdjoint (φ (b - a)) := map_star φ (b - a) ▸ ha'.star_eq ▸ rfl
+  rw [StarOrderedRing.nonneg_iff_quasispectrum_nonneg (R := ℝ),
+    StarOrderedRing.nonneg_iff_quasispectrum_nonneg (R := ℝ)]
+  refine ⟨fun h x hx ↦ ?_, fun h x hx ↦ ?_⟩
+  · have h_closed : IsClosed (NonUnitalStarAlgHom.range φ : Set B) :=
+      hφ.isClosedEmbedding.isClosed_range
+    let S : NonUnitalStarSubalgebra ℂ B := NonUnitalStarAlgHom.range φ
+    have : IsClosed (S : Set B) := h_closed
+    have h_eq : quasispectrum ℂ (φ (b - a)) = quasispectrum ℂ (⟨φ (b - a), NonUnitalStarAlgHom.mem_range_self φ _⟩ : S) :=
+      (NonUnitalStarSubalgebra.quasispectrum_eq S ⟨φ (b - a), NonUnitalStarAlgHom.mem_range_self φ _⟩).symm
+    rw [h_eq] at h
+    apply h
+    let e : A ≃⋆ₐ[ℂ] S := StarAlgEquiv.ofInjective' φ this
+    convert NonUnitalStarAlgEquiv.quasispectrum_eq e (b - a) ▸ hx
+    simp [e, S]
+  · specialize h x
+    have h_closed : IsClosed (NonUnitalStarAlgHom.range φ : Set B) :=
+      hφ.isClosedEmbedding.isClosed_range
+    let S : NonUnitalStarSubalgebra ℂ B := NonUnitalStarAlgHom.range φ
+    have : IsClosed (S : Set B) := h_closed
+    have h_eq : quasispectrum ℂ (φ (b - a)) = quasispectrum ℂ (⟨φ (b - a), NonUnitalStarAlgHom.mem_range_self φ _⟩ : S) :=
+      (NonUnitalStarSubalgebra.quasispectrum_eq S ⟨φ (b - a), NonUnitalStarAlgHom.mem_range_self φ _⟩).symm
+    rw [h_eq] at hx
+    apply h
+    let e : A ≃⋆ₐ[ℂ] S := StarAlgEquiv.ofInjective' φ this
+    convert (NonUnitalStarAlgEquiv.quasispectrum_eq e (b - a)).symm ▸ hx
+    simp [e, S]
+
+end QuasispectrumPermanence
+
 namespace Unitization
 
 variable {A : Type*} [NonUnitalCStarAlgebra A] [PartialOrder A] [StarOrderedRing A]
@@ -94,10 +213,7 @@ set_option backward.isDefEq.respectTransparency false in
 lemma inr_le_iff (a b : A) (ha : IsSelfAdjoint a := by cfc_tac)
     (hb : IsSelfAdjoint b := by cfc_tac) :
     (a : A⁺¹) ≤ (b : A⁺¹) ↔ a ≤ b := by
-  -- TODO: prove the more general result for star monomorphisms and use it here.
-  rw [← sub_nonneg, ← sub_nonneg (a := b), StarOrderedRing.nonneg_iff_spectrum_nonneg (R := ℝ) _,
-    ← inr_sub ℂ b a, ← Unitization.quasispectrum_eq_spectrum_inr' ℝ ℂ]
-  exact StarOrderedRing.nonneg_iff_quasispectrum_nonneg _ |>.symm
+  exact NonUnitalStarAlgHom.map_le_map_iff (inrNonUnitalStarAlgHom ℂ A) (isometry_inr (𝕜 := ℂ)) ha hb
 
 @[simp, norm_cast]
 lemma inr_nonneg_iff {a : A} : 0 ≤ (a : A⁺¹) ↔ 0 ≤ a := by
