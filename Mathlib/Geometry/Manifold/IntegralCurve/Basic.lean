@@ -30,14 +30,12 @@ Let `v : M → TM` be a vector field on `M`, and let `γ : ℝ → M`.
 * `IsMIntegralCurveOn γ v s`: `γ t` is tangent to `v (γ t)` for all `t ∈ s`, where `s : Set ℝ`.
 * `IsMIntegralCurveAt γ v t₀`: `γ t` is tangent to `v (γ t)` for all `t` in some open interval
   around `t₀`. That is, `γ` is a local integral curve of `v`.
+* `IsMIntegralCurveWithinAt γ v s t₀`: `γ t` is tangent to `v (γ t)` for all `t` in some
+  neighbourhood of `t₀` within `s`. That is, `γ` is a local integral curve of `v` within `s`.
 
 For `IsMIntegralCurveOn γ v s` and `IsMIntegralCurveAt γ v t₀`, even though `γ` is defined for all
 time, its value outside of the set `s` or a small interval around `t₀` is irrelevant and considered
 junk.
-
-## TODO
-
-* Implement `IsMIntegralCurveWithinAt`.
 
 ## Reference
 
@@ -70,6 +68,12 @@ local integral curve of `v` in a neighbourhood containing `t₀`. The value of `
 interval is irrelevant and considered junk. -/
 def IsMIntegralCurveAt (γ : ℝ → M) (v : (x : M) → TangentSpace I x) (t₀ : ℝ) : Prop :=
   ∀ᶠ t in 𝓝 t₀, HasMFDerivAt 𝓘(ℝ, ℝ) I γ t ((1 : ℝ →L[ℝ] ℝ).smulRight <| v (γ t))
+
+/-- If `v` is a vector field on `M` and `t₀ : ℝ`, `IsMIntegralCurveWithinAt γ v s t₀` means `γ : ℝ → M` is a
+local integral curve of `v` in a neighbourhood of `t₀` within `s`. The value of `γ` outside of this
+neighbourhood is irrelevant and considered junk. -/
+def IsMIntegralCurveWithinAt (γ : ℝ → M) (v : (x : M) → TangentSpace I x) (s : Set ℝ) (t₀ : ℝ) : Prop :=
+  ∀ᶠ t in 𝓝[s] t₀, HasMFDerivWithinAt 𝓘(ℝ, ℝ) I γ s t ((1 : ℝ →L[ℝ] ℝ).smulRight <| v (γ t))
 
 /-- If `v : M → TM` is a vector field on `M`, `IsMIntegralCurve γ v` means `γ : ℝ → M` is a global
 integral curve of `v`. That is, `γ t` is tangent to `v (γ t)` for all `t : ℝ`. -/
@@ -147,6 +151,19 @@ lemma isMIntegralCurveOn_iff_isMIntegralCurveAt (hs : IsOpen s) :
     IsMIntegralCurveOn γ v s ↔ ∀ t ∈ s, IsMIntegralCurveAt γ v t :=
   ⟨fun h _ ht ↦ h.isMIntegralCurveAt (hs.mem_nhds ht), IsMIntegralCurveAt.isMIntegralCurveOn⟩
 
+lemma IsMIntegralCurveOn.isMIntegralCurveWithinAt (h : IsMIntegralCurveOn γ v s) (ht : t₀ ∈ s) :
+    IsMIntegralCurveWithinAt γ v s t₀ :=
+  Filter.eventually_nhdsWithin_of_forall (fun _ ↦ h _ ) ht
+
+lemma isMIntegralCurveAt_iff_isMIntegralCurveWithinAt_univ :
+    IsMIntegralCurveAt γ v t₀ ↔ IsMIntegralCurveWithinAt γ v univ t₀ := by
+  simp [IsMIntegralCurveAt, IsMIntegralCurveWithinAt, nhdsWithin_univ]
+
+lemma IsMIntegralCurveWithinAt.hasMFDerivWithinAt (h : IsMIntegralCurveWithinAt γ v s t₀)
+    (ht₀ : t₀ ∈ s) :
+    HasMFDerivWithinAt 𝓘(ℝ, ℝ) I γ s t₀ ((1 : ℝ →L[ℝ] ℝ).smulRight <| v (γ t₀)) :=
+  (Filter.eventually_nhdsWithin_iff.mp h).self_of_nhdsWithin ht₀
+
 lemma IsMIntegralCurveOn.continuousWithinAt (hγ : IsMIntegralCurveOn γ v s) (ht : t₀ ∈ s) :
     ContinuousWithinAt γ s t₀ := (hγ t₀ ht).1
 
@@ -157,6 +174,10 @@ lemma IsMIntegralCurveAt.continuousAt (hγ : IsMIntegralCurveAt γ v t₀) :
     ContinuousAt γ t₀ :=
   have ⟨_, hs, hγ⟩ := isMIntegralCurveAt_iff.mp hγ
   hγ.continuousWithinAt (mem_of_mem_nhds hs) |>.continuousAt hs
+
+lemma IsMIntegralCurveWithinAt.continuousWithinAt (hγ : IsMIntegralCurveWithinAt γ v s t₀)
+    (ht₀ : t₀ ∈ s) : ContinuousWithinAt γ s t₀ :=
+  (hγ.hasMFDerivWithinAt ht₀).continuousWithinAt
 
 lemma IsMIntegralCurve.continuous (hγ : IsMIntegralCurve γ v) : Continuous γ :=
   continuous_iff_continuousAt.mpr fun t ↦ (hγ.isMIntegralCurveAt t).continuousAt
