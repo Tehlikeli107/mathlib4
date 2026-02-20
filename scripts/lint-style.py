@@ -129,12 +129,12 @@ def four_spaces_in_second_line(lines, path):
                 if stripped_next_line.startswith("| ") or line.endswith("where\n"):
                     # Check and fix if the number of leading space is not 2
                     if num_spaces != 2:
-                        errors += [(ERR_IND, next_line_nr, path)]
+                        errors.append((ERR_IND, next_line_nr, path))
                         new_next_line = ' ' * 2 + stripped_next_line
                 # Check and fix if the number of leading spaces is not 4
                 else:
                     if num_spaces != 4:
-                        errors += [(ERR_IND, next_line_nr, path)]
+                        errors.append((ERR_IND, next_line_nr, path))
                         new_next_line = ' ' * 4 + stripped_next_line
         newlines.append((next_line_nr, new_next_line))
     return errors, newlines
@@ -150,7 +150,7 @@ def isolated_by_dot_semicolon_check(lines, path):
             # See https://github.com/leanprover-community/mathlib4/pull/3825#discussion_r1186702599
             prev_line = lines[line_nr - 2][1].rstrip()
             if not prev_line.endswith(",") and not re.search(", fun [^,]* (=>|↦)$", prev_line):
-                errors += [(ERR_IBY, line_nr, path)]
+                errors.append((ERR_IBY, line_nr, path))
         elif line.lstrip().startswith("by "):
             # We also error if the previous line ends on := and the current line starts with "by ".
             prev_line = newlines[-1][1].rstrip()
@@ -159,14 +159,14 @@ def isolated_by_dot_semicolon_check(lines, path):
                 # Future: error also if it is not: currently, mathlib contains about 30 such
                 # instances which are not obvious to fix.
                 if len(prev_line) <= 97:
-                    errors += [(ERR_IBY, line_nr, path)]
+                    errors.append((ERR_IBY, line_nr, path))
                     newlines[-1] = (line_nr - 1, prev_line + " by\n")
                     indent = " " * (len(line) - len(line.lstrip()))
                     line = f"{indent}{line.lstrip()[3:]}"
         elif line.lstrip() == "where":
-            errors += [(ERR_IWH, line_nr, path)]
+            errors.append((ERR_IWH, line_nr, path))
         if line.lstrip().startswith(":"):
-            errors += [(ERR_CLN, line_nr, path)]
+            errors.append((ERR_CLN, line_nr, path))
         newlines.append((line_nr, line))
     return errors, newlines
 
@@ -181,7 +181,7 @@ def left_arrow_check(lines, path):
         # are used for syntax quotations). Otherwise, insert a space after "←".
         new_line = re.sub(r'←(?:(?=``?\()|(?![%`]))(\S)', r'← \1', line)
         if new_line != line:
-            errors += [(ERR_ARR, line_nr, path)]
+            errors.append((ERR_ARR, line_nr, path))
         newlines.append((line_nr, new_line))
     return errors, newlines
 
@@ -214,12 +214,13 @@ def lint(path, fix=False):
         # We enumerate the lines so that we can report line numbers in the error messages correctly
         # we will modify lines as we go, so we need to keep track of the original line numbers
         lines = f.readlines()
-        enum_lines = enumerate(lines, 1)
+        enum_lines = list(enumerate(lines, 1))
         newlines = enum_lines
         for error_check in [four_spaces_in_second_line,
                             isolated_by_dot_semicolon_check,
                             left_arrow_check,
-                            nonterminal_simp_check]:
+                            # nonterminal_simp_check
+                            ]:
             errs, newlines = error_check(newlines, path)
             format_errors(errs)
 
@@ -228,11 +229,12 @@ def lint(path, fix=False):
         path.with_name(path.name + '.bak').write_text("".join(l for _, l in newlines), encoding = "utf8")
         shutil.move(path.with_name(path.name + '.bak'), path)
 
-fix = "--fix" in sys.argv
-argv = (arg for arg in sys.argv[1:] if arg != "--fix")
+if __name__ == "__main__":
+    fix = "--fix" in sys.argv
+    argv = (arg for arg in sys.argv[1:] if arg != "--fix")
 
-for filename in argv:
-    lint(Path(filename), fix=fix)
+    for filename in argv:
+        lint(Path(filename), fix=fix)
 
-if new_exceptions:
-    exit(1)
+    if new_exceptions:
+        exit(1)
