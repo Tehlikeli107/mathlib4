@@ -194,24 +194,12 @@ theorem isMIntegralCurveOn_Ioo_eqOn_of_contMDiff (ht₀ : t₀ ∈ Ioo a b)
   suffices hsub : Ioo a b ⊆ s from fun t ht ↦ mem_setOf.mp ((subset_def ▸ hsub) t ht).1
   apply isPreconnected_Ioo.subset_of_closure_inter_subset (s := Ioo a b) (u := s) _
     ⟨t₀, ⟨ht₀, ⟨h, ht₀⟩⟩⟩
-  · -- is this really the most convenient way to pass to subtype topology?
-    -- TODO: shorten this when better API around subtype topology exists
-    rw [hs, inter_comm, ← Subtype.image_preimage_val, inter_comm, ← Subtype.image_preimage_val,
-      image_subset_image_iff Subtype.val_injective, preimage_setOf_eq]
-    intro t ht
-    rw [mem_preimage, ← closure_subtype] at ht
-    revert ht t
-    apply IsClosed.closure_subset (isClosed_eq _ _)
-    · rw [continuous_iff_continuousAt]
-      rintro ⟨_, ht⟩
-      apply ContinuousAt.comp _ continuousAt_subtype_val
-      rw [Subtype.coe_mk]
-      exact hγ.continuousWithinAt ht |>.continuousAt (Ioo_mem_nhds ht.1 ht.2)
-    · rw [continuous_iff_continuousAt]
-      rintro ⟨_, ht⟩
-      apply ContinuousAt.comp _ continuousAt_subtype_val
-      rw [Subtype.coe_mk]
-      exact hγ'.continuousWithinAt ht |>.continuousAt (Ioo_mem_nhds ht.1 ht.2)
+  · rw [hs]
+    intro t ⟨ht_clos, ht_mem⟩
+    have hx : (⟨t, ht_mem⟩ : Ioo a b) ∈ closure {x : Ioo a b | γ x = γ' x} := by
+      rw [closure_subtype]
+      exact ht_clos
+    exact ⟨(isClosed_eq hγ.continuousOn.continuous hγ'.continuousOn.continuous).closure_subset hx, ht_mem⟩
   · rw [isOpen_iff_mem_nhds]
     intro t₁ ht₁
     have hmem := Ioo_mem_nhds ht₁.2.1 ht₁.2.2
