@@ -96,100 +96,105 @@ class ThousandPlusTheorem:
     comment: Optional[str] = None
 
 
-hundred_yaml = sys.argv[1]
-thousand_yaml = sys.argv[2]
-overview_yaml = sys.argv[3]
-undergrad_yaml = sys.argv[4]
+def main():
+    hundred_yaml = sys.argv[1]
+    thousand_yaml = sys.argv[2]
+    overview_yaml = sys.argv[3]
+    undergrad_yaml = sys.argv[4]
 
-with open(hundred_yaml, "r", encoding="utf8") as hy:
-    hundred = yaml.safe_load(hy)
-with open(thousand_yaml, "r", encoding="utf8") as hy:
-    thousand = yaml.safe_load(hy)
-with open(overview_yaml, "r", encoding="utf8") as hy:
-    overview = yaml.safe_load(hy)
-with open(undergrad_yaml, "r", encoding="utf8") as hy:
-    undergrad = yaml.safe_load(hy)
+    with open(hundred_yaml, "r", encoding="utf8") as hy:
+        hundred = yaml.safe_load(hy)
+    with open(thousand_yaml, "r", encoding="utf8") as hy:
+        thousand = yaml.safe_load(hy)
+    with open(overview_yaml, "r", encoding="utf8") as hy:
+        overview = yaml.safe_load(hy)
+    with open(undergrad_yaml, "r", encoding="utf8") as hy:
+        undergrad = yaml.safe_load(hy)
 
-hundred_decls: List[Tuple[str, str]] = []
+    hundred_decls: List[Tuple[str, str]] = []
 
-errors = 0
-for index, entry in hundred.items():
-    # Check that the YAML fits the dataclass used in the website.
-    try:
-        _thm = HundredTheorem(index, **entry)
-    except TypeError as e:
-        print(f"error: entry for theorem {index} is invalid: {e}")
-        errors += 1
-    # Also verify that the |decl| and |decls| fields are not *both* provided.
-    if _thm.decl and _thm.decls:
-        print(
-            f"warning: entry for theorem {index} has both a decl and a decls field; "
-            "please only provide one of these",
-            file=sys.stderr,
-        )
-        errors += 1
-
-    title = entry["title"]
-    if "decl" in entry:
-        hundred_decls.append((f"{index} {title}", entry["decl"]))
-    elif "decls" in entry:
-        if not isinstance(entry["decls"], list):
-            print(f"For key {index} ({title}): did you mean `decl` instead of `decls`?")
+    errors = 0
+    for index, entry in hundred.items():
+        # Check that the YAML fits the dataclass used in the website.
+        try:
+            _thm = HundredTheorem(index, **entry)
+        except TypeError as e:
+            print(f"error: entry for theorem {index} is invalid: {e}")
             errors += 1
-        hundred_decls = hundred_decls + [(f"{index} {title}", d) for d in entry["decls"]]
-
-thousand_decls: List[Tuple[str, str]] = []
-for index, entry in thousand.items():
-    # Check that the YAML fits the dataclass used in the website.
-    try:
-        _thm = ThousandPlusTheorem(index, **entry)
-    except TypeError as e:
-        print(f"error: entry for theorem {index} is invalid: {e}", file=sys.stderr)
-        errors += 1
-    # Also verify that the |decl| and |decls| fields are not *both* provided.
-    if _thm.decl and _thm.decls:
-        print(
-            f"error: entry for theorem {index} has both a decl and a decls field; "
-            "please only provide one of these",
-            file=sys.stderr,
-        )
-        errors += 1
-    elif _thm.statement and (_thm.decl or _thm.decls):
-        print(
-            f"error: entry for theorem {index} has both a statement and a decl(s) field: "
-            "the former is superfluous; please remove it",
-            file=sys.stderr,
-        )
-        errors += 1
-
-    title = entry["title"]
-    if "decl" in entry:
-        thousand_decls.append((f"{index} {title}", entry["decl"]))
-    elif "decls" in entry:
-        if not isinstance(entry["decls"], list):
-            print(f"For key {index} ({title}): did you mean `decl` instead of `decls`?")
+        # Also verify that the |decl| and |decls| fields are not *both* provided.
+        if _thm.decl and _thm.decls:
+            print(
+                f"warning: entry for theorem {index} has both a decl and a decls field; "
+                "please only provide one of these",
+                file=sys.stderr,
+            )
             errors += 1
-        thousand_decls = thousand_decls + [(f"{index} {title}", d) for d in entry["decls"]]
-    elif "statement" in entry:
-        thousand_decls.append((f"{index} {title}", entry["statement"]))
 
-overview_decls = tiered_extract(overview)
-assert all(len(n) >= 3 for n, _ in overview_decls), "Expected more nesting"
-overview_decls = flatten_names(overview_decls)
+        title = entry["title"]
+        if "decl" in entry:
+            hundred_decls.append((f"{index} {title}", entry["decl"]))
+        elif "decls" in entry:
+            if not isinstance(entry["decls"], list):
+                print(f"For key {index} ({title}): did you mean `decl` instead of `decls`?")
+                errors += 1
+            hundred_decls = hundred_decls + [(f"{index} {title}", d) for d in entry["decls"]]
 
-undergrad_decls = tiered_extract(undergrad)
-assert all(len(n) >= 3 for n, _ in undergrad_decls), "Expected more nesting"
-undergrad_decls = flatten_names(undergrad_decls)
+    thousand_decls: List[Tuple[str, str]] = []
+    for index, entry in thousand.items():
+        # Check that the YAML fits the dataclass used in the website.
+        try:
+            _thm = ThousandPlusTheorem(index, **entry)
+        except TypeError as e:
+            print(f"error: entry for theorem {index} is invalid: {e}", file=sys.stderr)
+            errors += 1
+        # Also verify that the |decl| and |decls| fields are not *both* provided.
+        if _thm.decl and _thm.decls:
+            print(
+                f"error: entry for theorem {index} has both a decl and a decls field; "
+                "please only provide one of these",
+                file=sys.stderr,
+            )
+            errors += 1
+        elif _thm.statement and (_thm.decl or _thm.decls):
+            print(
+                f"error: entry for theorem {index} has both a statement and a decl(s) field: "
+                "the former is superfluous; please remove it",
+                file=sys.stderr,
+            )
+            errors += 1
 
-with open("100.json", "w", encoding="utf8") as f:
-    json.dump(hundred_decls, f)
-with open("1000.json", "w", encoding="utf8") as f:
-    json.dump(thousand_decls, f)
-with open("overview.json", "w", encoding="utf8") as f:
-    json.dump(overview_decls, f)
-with open("undergrad.json", "w", encoding="utf8") as f:
-    json.dump(undergrad_decls, f)
+        title = entry["title"]
+        if "decl" in entry:
+            thousand_decls.append((f"{index} {title}", entry["decl"]))
+        elif "decls" in entry:
+            if not isinstance(entry["decls"], list):
+                print(f"For key {index} ({title}): did you mean `decl` instead of `decls`?")
+                errors += 1
+            thousand_decls = thousand_decls + [(f"{index} {title}", d) for d in entry["decls"]]
+        elif "statement" in entry:
+            thousand_decls.append((f"{index} {title}", entry["statement"]))
 
-if errors:
-    # Return an error code of at most 125 so this return value can be used further in shell scripts.
-    sys.exit(min(errors, 125))
+    overview_decls = tiered_extract(overview)
+    assert all(len(n) >= 3 for n, _ in overview_decls), "Expected more nesting"
+    overview_decls = flatten_names(overview_decls)
+
+    undergrad_decls = tiered_extract(undergrad)
+    assert all(len(n) >= 3 for n, _ in undergrad_decls), "Expected more nesting"
+    undergrad_decls = flatten_names(undergrad_decls)
+
+    with open("100.json", "w", encoding="utf8") as f:
+        json.dump(hundred_decls, f)
+    with open("1000.json", "w", encoding="utf8") as f:
+        json.dump(thousand_decls, f)
+    with open("overview.json", "w", encoding="utf8") as f:
+        json.dump(overview_decls, f)
+    with open("undergrad.json", "w", encoding="utf8") as f:
+        json.dump(undergrad_decls, f)
+
+    if errors:
+        # Return an error code of at most 125 so this return value can be used further in shell scripts.
+        sys.exit(min(errors, 125))
+
+
+if __name__ == "__main__":
+    main()
