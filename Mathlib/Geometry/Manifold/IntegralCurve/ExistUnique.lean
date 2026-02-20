@@ -3,12 +3,14 @@ Copyright (c) 2023 Winston Yin. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Winston Yin
 -/
-module
+module Mathlib.Geometry.Manifold.IntegralCurve.ExistUnique
 
 public import Mathlib.Analysis.ODE.Gronwall
 public import Mathlib.Analysis.ODE.PicardLindelof
 public import Mathlib.Geometry.Manifold.IntegralCurve.Transform
 public import Mathlib.Geometry.Manifold.IsManifold.InteriorBoundary
+public import Mathlib.Topology.MetricSpace.Lipschitz
+public import Mathlib.Analysis.Normed.Module.FiniteDimension
 
 /-!
 # Existence and uniqueness of integral curves
@@ -44,7 +46,7 @@ We state simpler versions of the theorem for boundaryless manifolds as corollari
 integral curve, vector field, local existence, uniqueness
 -/
 
-public section
+noncomputable section
 
 open scoped Topology
 
@@ -118,6 +120,113 @@ lemma exists_isMIntegralCurveAt_of_contMDiffAt_boundaryless
     (hv : ContMDiffAt I I.tangent 1 (fun x ↦ (⟨x, v x⟩ : TangentBundle I M)) x₀) :
     ∃ γ : ℝ → M, γ t₀ = x₀ ∧ IsMIntegralCurveAt γ v t₀ :=
   exists_isMIntegralCurveAt_of_contMDiffAt t₀ hv BoundarylessManifold.isInteriorPoint
+
+/-- Existence of local integral curves for a $C^1$ vector field at any point of a finite dimensional
+`C^1` manifold. -/
+theorem exists_isMIntegralCurveWithinAt_of_contMDiffAt [FiniteDimensional ℝ E]
+    (hv : ContMDiffAt I I.tangent 1 (fun x ↦ (⟨x, v x⟩ : TangentBundle I M)) x₀) :
+    ∃ γ : ℝ → M, ∃ s : Set ℝ, t₀ ∈ s ∧ IsMIntegralCurveWithinAt γ v s t₀ := by
+  -- extract local representative
+  rw [contMDiffAt_iff] at hv
+  obtain ⟨u, hu, hv⟩ := hv
+  rcases mem_nhds_iff.mp hu with ⟨U, hUu, hU, hx0⟩
+  let x_chart := extChartAt I x₀ x₀
+  obtain ⟨r, hr, hball⟩ : ∃ r > 0, Metric.closedBall x_chart r ⊆ U :=
+    Metric.nhds_basis_closedBall.mem_iff.mp (hU.mem_nhds hx0)
+  let f := (fun x ↦ tangentCoordChange I ((extChartAt I x₀).symm x) x₀ ((extChartAt I x₀).symm x)
+    (v ((extChartAt I x₀).symm x)))
+  let s_lip := range I ∩ Metric.closedBall x_chart r
+  have hconvex : Convex ℝ s_lip := (I.convex_range).inter (Metric.convex_closedBall _ _)
+  have hbounded : Metric.IsBounded s_lip := Metric.isBounded_closedBall.subset inter_subset_right
+  have hcont : ContDiffOn ℝ 1 f s_lip := by
+    apply hv.mono
+    intro x hx
+    exact ⟨hx.1, hball hx.2⟩
+  obtain ⟨K, hK_lip⟩ := hcont.exists_lipschitzOnWith hconvex hbounded
+  -- extend f from s_lip to E
+  let iso := (Module.Finite.finBasis ℝ E).equivFun
+  let K_iso := ‖(iso : E →L[ℝ] (Fin (Module.Finite.finBasis ℝ E).index.card → ℝ))‖₊
+  let K_pi := K_iso * K
+  have hf_pi_lip : LipschitzOnWith K_pi (iso ∘ f) s_lip :=
+    LipschitzOnWith.comp iso.lipschitz.lipschitzOnWith hK_lip subset_rfl
+  obtain ⟨g_pi, hg_pi_lip, hg_pi_eq⟩ := LipschitzOnWith.extend_pi hf_pi_lip
+  let g := iso.symm ∘ g_pi
+  let K_symm := ‖(iso.symm : _ →L[ℝ] E)‖₊
+  let K_g := K_symm * K_pi
+  have hg_lip : LipschitzWith K_g g :=
+    LipschitzWith.comp iso.symm.lipschitz.lipschitzWith hg_pi_lip
+  have hg_eq (x : E) (hx : x ∈ s_lip) : g x = f x := by
+    simp only [g, Function.comp_apply]
+    rw [hg_pi_eq hx, iso.symm_apply_apply]
+  obtain ⟨C, hC⟩ : ∃ C, ∀ x ∈ Metric.closedBall x_chart r, ‖g x‖ ≤ C := by
+    have : ContinuousOn g (Metric.closedBall x_chart r) := hg_lip.continuous.continuousOn
+    exact this.bounded_image Metric.isBounded_closedBall |>.exists_norm_le
+  let L := K_g
+  let ε := r / (C + 1)
+  have hε : 0 < ε := div_pos hr (add_pos_of_nonneg_of_pos (norm_nonneg _) zero_lt_one)
+  have h_picard : IsPicardLindelof (fun _ _ ↦ g) ⟨t₀, le_rfl, le_rfl⟩ x_chart r 0 C L :=
+    IsPicardLindelof.of_time_independent (fun x hx ↦ hC x hx) (hg_lip.lipschitzOnWith _)
+      (by
+        rw [sub_zero]
+        refine le_trans (mul_le_mul_of_nonneg_left ?_ (L.2)) ?_
+        · rw [max_comm, max_eq_left (sub_le_self _ (le_of_lt hε))]
+          simp only [tsub_le_iff_right, le_add_iff_nonneg_right, abs_nonneg]
+          rw [div_mul_eq_mul_div, mul_comm, ← div_mul_eq_mul_div]
+          apply div_le_of_nonneg_of_le_mul (by positivity) (by positivity)
+          rw [mul_add, mul_one]
+          apply add_le_add_left
+          exact le_mul_of_one_le_right (le_of_lt hr) (norm_nonneg _)
+        · exact le_rfl)
+  obtain ⟨α, hα⟩ := ODE.FunSpace.exists_isFixedPt_next h_picard (Metric.mem_closedBall_self (le_of_lt hr))
+  let γ_E := α.compProj
+  let s := { t ∈ Icc (t₀ - ε) (t₀ + ε) | γ_E t ∈ range I }
+  refine ⟨(extChartAt I x₀).symm ∘ γ_E, s, ?_⟩
+  have ht0_s : t₀ ∈ s := by
+    simp [s, hε.le]
+    rw [ODE.FunSpace.compProj_val, ← hα, ODE.FunSpace.next_apply₀]
+    exact mem_extChartAt_source .. ▸ mem_range_self _
+  constructor
+  · exact ht0_s
+  rw [IsMIntegralCurveWithinAt, Filter.eventually_nhdsWithin_iff]
+  filter_upwards [self_mem_nhdsWithin]
+  intro t ht
+  rcases ht with ⟨ht_icc, ht_range⟩
+  have h_deriv_E : HasDerivWithinAt γ_E (g (γ_E t)) (Icc (t₀ - ε) (t₀ + ε)) t := by
+    apply ODE.hasDerivWithinAt_picard_Icc (x₀ := x_chart) (t := t) (tmin := t₀ - ε) (tmax := t₀ + ε)
+    · simp [hε.le]
+    · exact h_picard.continuousOn_uncurry
+    · exact α.continuous_compProj.continuousOn
+    · intro t ht
+      exact α.compProj_mem_closedBall h_picard.mul_max_le
+    · exact ht_icc
+  have h_mem_ball : γ_E t ∈ Metric.closedBall x_chart r :=
+    α.compProj_mem_closedBall h_picard.mul_max_le
+  have h_eq_f : g (γ_E t) = f (γ_E t) := hg_eq _ ⟨ht_range, h_mem_ball⟩
+  rw [h_eq_f] at h_deriv_E
+  let xₜ : M := (extChartAt I x₀).symm (γ_E t)
+  -- Transform derivative to chart at xₜ
+  rw [HasMFDerivWithinAt, hasMFDerivWithinAt_iff_hasFDerivWithinAt]
+  -- We need HasFDerivWithinAt (extChartAt I xₜ ∘ (extChartAt I x₀).symm ∘ γ_E) (v xₜ) s t
+  -- We have HasFDerivWithinAt γ_E (f (γ_E t)) s t
+  -- We use chain rule.
+  let ψ := extChartAt I x₀
+  let ψ' := extChartAt I xₜ
+  -- Note: xₜ = ψ.symm (γ_E t)
+  -- We want D(ψ' ∘ ψ.symm) (γ_E t) (f (γ_E t)) = v xₜ
+  have h_trans : HasFDerivWithinAt (ψ' ∘ ψ.symm) (v xₜ) (range I) (γ_E t) := by
+    rw [hasFDerivWithinAt_iff_hasFDerivAt_of_mem_interior]
+    · rw [← tangentCoordChange_def]
+      rw [tangentCoordChange_comp (y := x₀)]
+      · rw [tangentCoordChange_self]
+        · simp only [ContinuousLinearMap.one_comp, xₜ, ψ, ψ']
+        · exact mem_extChartAt_source ..
+      · exact ⟨mem_extChartAt_source .., mem_extChartAt_source ..⟩
+      · simp only [Function.comp_apply, PartialHomeomorph.left_inv, xₜ, ψ, ψ']
+    · apply (hasFDerivWithinAt_tangentCoordChange ⟨mem_extChartAt_source .., mem_extChartAt_source ..⟩).congr
+      · intro y hy; rfl
+      · rfl
+  refine HasFDerivWithinAt.comp _ h_trans (h_deriv_E.mono (sep_subset _ _)) ?_
+  · apply mapsTo_image
 
 variable {t₀}
 
