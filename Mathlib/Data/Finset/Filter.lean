@@ -96,14 +96,16 @@ meta def elabFinsetBuilderSep : TermElab
   | `({ $x:ident ∈ $s:term | $p }), expectedType? => do
     -- If the expected type is known to be `Set ?α`, give up. If it is not known to be `Set ?α` or
     -- `Finset ?α`, check the expected type of `s`.
-    unless ← knownToBeFinsetNotSet expectedType? do
-      let ty ← try whnfR (← inferType (← elabTerm s none)) catch _ => throwUnsupportedSyntax
-      -- If the expected type of `s` is not known to be `Finset ?α`, give up.
-      match_expr ty with
-      | Finset _ => pure ()
-      | _ => throwUnsupportedSyntax
+    let expectedType? ← do
+      if ← knownToBeFinsetNotSet expectedType? then
+        pure expectedType?
+      else
+        let ty ← try whnfR (← inferType (← elabTerm s none)) catch _ => throwUnsupportedSyntax
+        -- If the expected type of `s` is not known to be `Finset ?α`, give up.
+        match_expr ty with
+        | Finset _ => pure (some ty)
+        | _ => throwUnsupportedSyntax
     -- Finally, we can elaborate the syntax as a finset.
-    -- TODO: Seems a bit wasteful to have computed the expected type but still use `expectedType?`.
     elabTerm (← `(Finset.filter (fun $x:ident ↦ $p) $s)) expectedType?
   | _, _ => throwUnsupportedSyntax
 
