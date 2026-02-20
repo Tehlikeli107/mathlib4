@@ -42,6 +42,8 @@ ERR_CLN = 16 # line starts with a colon
 ERR_IND = 17 # second line not correctly indented
 ERR_ARR = 18 # space after "←"
 
+FOUR_SPACES_REGEX = re.compile(r"^(protected )?(def|lemma|theorem) (?!.*:=).*(where)?$")
+
 exceptions = []
 new_exceptions = False
 
@@ -117,8 +119,7 @@ def four_spaces_in_second_line(lines, path):
                                                                    annotated_lines[1:]):
         # Check if the current line matches "(lemma|theorem) .* :"
         new_next_line = next_line
-        if (not is_comment) and re.search(r"^(protected )?(def|lemma|theorem) (?!.*:=).*(where)?$",
-                                          line):
+        if (not is_comment) and FOUR_SPACES_REGEX.search(line):
             # Calculate the number of spaces before the first non-space character in the next line
             stripped_next_line = next_line.lstrip()
             if not (next_line == '\n' or next_line.startswith("#") or stripped_next_line.startswith("--")):
@@ -208,13 +209,17 @@ def format_errors(errors):
         if errno == ERR_ARR:
             output_message(path, line_nr, "ERR_ARR", "Missing space after '←'.")
 
+def nonterminal_simp_check(lines, path):
+    # TODO: this check was referenced but not defined. Adding a dummy implementation to fix the crash.
+    return [], lines
+
 def lint(path, fix=False):
     global new_exceptions
     with path.open(encoding="utf-8", newline="") as f:
         # We enumerate the lines so that we can report line numbers in the error messages correctly
         # we will modify lines as we go, so we need to keep track of the original line numbers
         lines = f.readlines()
-        enum_lines = enumerate(lines, 1)
+        enum_lines = list(enumerate(lines, 1))
         newlines = enum_lines
         for error_check in [four_spaces_in_second_line,
                             isolated_by_dot_semicolon_check,
