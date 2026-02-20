@@ -63,61 +63,6 @@ where repoFromURL (url : String) : IO String := do
         {errorContext}\n\
         Please ensure the remote URL is valid and points to a GitHub repository."
 
-/--
-Finds the remote name that points to `leanprover-community/mathlib4` repository.
-Returns the remote name and prints warnings if the setup doesn't follow conventions.
--/
-def findMathlibRemote (mathlibDepPath : FilePath) : IO String := do
-  let remotesInfo ← IO.Process.output
-    {cmd := "git", args := #["remote", "-v"], cwd := mathlibDepPath}
-
-  unless remotesInfo.exitCode == 0 do
-    throw <| IO.userError s!"\
-      Failed to run Git to list remotes (exit code: {remotesInfo.exitCode}).\n\
-      Ensure Git is installed.\n\
-      Stdout:\n{remotesInfo.stdout.trimAscii}\nStderr:\n{remotesInfo.stderr.trimAscii}\n"
-
-  let remoteLines := remotesInfo.stdout.splitToList (· == '\n')
-  let mut mathlibRemote : Option String := none
-  let mut originPointsToMathlib : Bool := false
-
-  for line in remoteLines do
-    let parts := line.trimAscii.copy.splitToList (· == '\t')
-    if parts.length >= 2 then
-      let remoteName := parts[0]!
-      let remoteUrl := parts[1]!.takeWhile (· != ' ') |>.copy -- Remove (fetch) or (push) suffix
-
-      -- Check if this remote points to leanprover-community/mathlib4
-      let isMathlibRepo := remoteUrl.containsSubstr "leanprover-community/mathlib4"
-
-      if isMathlibRepo then
-        if remoteName == "origin" then
-          originPointsToMathlib := true
-        mathlibRemote := some remoteName
-
-  match mathlibRemote with
-  | none =>
-    throw <| IO.userError "Could not find a remote pointing to leanprover-community/mathlib4"
-  | some remoteName =>
-    if remoteName != "upstream" then
-      let mut warning := s!"Some Mathlib ecosystem tools assume that the git remote for `leanprover-community/mathlib4` is named `upstream`. You have named it `{remoteName}` instead. We recommend changing the name to `upstream`."
-      if originPointsToMathlib then
-        warning := warning ++ " Moreover, `origin` should point to your own fork of the mathlib4 repository."
-      warning := warning ++ " You can set this up with `git remote add upstream https://github.com/leanprover-community/mathlib4.git`."
-      IO.println s!"Warning: {warning}"
-    return remoteName
-
-/--
-Extracts PR number from a git ref like "refs/remotes/upstream/pr/1234"
--/
-def extractPRNumber (ref : String) : Option Nat := do
-  let parts := ref.splitToList (· == '/')
-  if parts.length >= 2 && parts[parts.length - 2]! == "pr" then
-    let prStr := parts[parts.length - 1]!
-    prStr.toNat?
-  else
-    none
-
 /-- Check if we're in a detached HEAD state at a nightly-testing tag -/
 def isDetachedAtNightlyTesting (mathlibDepPath : FilePath) : IO Bool := do
   -- Get the current commit hash and check if it's a nightly-testing tag
@@ -176,52 +121,6 @@ def getRemoteRepo (mathlibDepPath : FilePath) : IO RepoInfo := do
       let cacheService := if useCloudflareCache then "Cloudflare" else "Azure"
       IO.println s!"Using cache ({cacheService}) from nightly-testing remote: {repo}"
       return {repo := repo, useFirst := true}
-
-    -- Only search for PR refs if we're not on a regular branch like master, bump/*, or nightly-testing*
-    -- let isSpecialBranch := branchName == "master" || branchName.startsWith "bump/" ||
-    --                       branchName.startsWith "nightly-testing"
-
-    -- TODO: this code is currently broken in two ways: 1. you need to write `%(refname)` in quotes and
-    -- 2. it is looking in the wrong place when in detached HEAD state.
-    -- We comment it out for now, but we should fix it later.
-    -- Check if the current commit coincides with any PR ref
-    -- if !isSpecialBranch then
-    --   let mathlibRemoteName ← findMathlibRemote mathlibDepPath
-    --   let currentCommit ← IO.Process.output
-    --     {cmd := "git", args := #["rev-parse", "HEAD"], cwd := mathlibDepPath}
-    --
-    --   if currentCommit.exitCode == 0 then
-    --     let commit := currentCommit.stdout.trim
-    --     -- Get all PR refs that contain this commit
-    --     let prRefPattern := s!"refs/remotes/{mathlibRemoteName}/pr/*"
-    --     let refsInfo ← IO.Process.output
-    --       {cmd := "git", args := #["for-each-ref", "--contains", commit, prRefPattern, "--format=%(refname)"], cwd := mathlibDepPath}
-    --     -- The code below is for debugging purposes currently
-    --     IO.println s!"`git for-each-ref --contains {commit} {prRefPattern} --format=%(refname)` returned:
-    --     {refsInfo.stdout.trim} with exit code {refsInfo.exitCode} and stderr: {refsInfo.stderr.trim}."
-    --     let refsInfo' ← IO.Process.output
-    --       {cmd := "git", args := #["for-each-ref", "--contains", commit, prRefPattern, "--format=\"%(refname)\""], cwd := mathlibDepPath}
-    --     IO.println s!"`git for-each-ref --contains {commit} {prRefPattern} --format=\"%(refname)\"` returned:
-    --     {refsInfo'.stdout.trim} with exit code {refsInfo'.exitCode} and stderr: {refsInfo'.stderr.trim}."
-    --
-    --     if refsInfo.exitCode == 0 && !refsInfo.stdout.trim.isEmpty then
-    --       let prRefs := refsInfo.stdout.trim.split (· == '\n')
-    --       -- Extract PR numbers from refs like "refs/remotes/upstream/pr/1234"
-    --       for prRef in prRefs do
-    --         if let some prNumber := extractPRNumber prRef then
-    --           -- Get PR details using gh
-    --           let prInfo ← IO.Process.output
-    --             {cmd := "gh", args := #["pr", "view", toString prNumber, "--json", "headRefName,headRepositoryOwner,number"], cwd := mathlibDepPath}
-    --           if prInfo.exitCode == 0 then
-    --             if let .ok json := Lean.Json.parse prInfo.stdout.trim then
-    --               if let .ok owner := json.getObjValAs? Lean.Json "headRepositoryOwner" then
-    --                 if let .ok login := owner.getObjValAs? String "login" then
-    --                   if let .ok repoName := json.getObjValAs? String "headRefName" then
-    --                     if let .ok prNum := json.getObjValAs? Nat "number" then
-    --                       let repo := s!"{login}/mathlib4"
-    --                       IO.println s!"Using cache from PR #{prNum} source: {login}/{repoName} (commit {commit.take 8} found in PR ref)"
-    --                       let useFirst := if login != "leanprover-community" then true else false
-    --                       return {repo := repo, useFirst := useFirst}
 
   -- Fall back to using the remote that the current branch is tracking
   let trackingRemote ← IO.Process.output
