@@ -42,7 +42,7 @@ def process_file(file_path, edits):
     with open(file_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
 
-    for edit in sorted(edits, key=lambda e: e['line_num'], reverse=True):
+    for edit in sorted(edits, key=lambda e: (e['line_num'], e['col_num']), reverse=True):
         line_num = edit['line_num'] - 1
         col_num = edit['col_num'] - 1
         var_name = edit['var_name']
