@@ -89,6 +89,20 @@ such that `positivity` successfully recognises both `a` and `b`. -/
     pure (.nonzero q(ite_ne_zero $p $pa $pb))
   | _, _ => pure .none
 
+/-- The `positivity` extension which identifies expressions of the form `OfNat.ofNat n` applied to arguments,
+such as `(1 : X → ℝ) x`, which reduces to `1`. -/
+@[positivity OfNat.ofNat _ _ _] def evalOfNat : PositivityExt where eval {u α} zα pα e := do
+  let .app _ _ ← whnfR e | throwError "not an application"
+  guard <| e.getAppNumArgs > 3
+  let e' ← whnf e
+  haveI : $e =Q $e' := ⟨⟩
+  let res ← core zα pα e'
+  match res with
+  | .positive pf => pure (.positive pf)
+  | .nonnegative pf => pure (.nonnegative pf)
+  | .nonzero pf => pure (.nonzero pf)
+  | .none => pure .none
+
 section LinearOrder
 variable {R : Type*} [LinearOrder R] {a b c : R}
 

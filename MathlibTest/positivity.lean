@@ -616,3 +616,16 @@ example [Semiring S] [PartialOrder S] [IsOrderedRing S] [Semiring R]
     (abv : R → S) [IsAbsoluteValue abv] (x : R) :
     0 ≤ abv x := by
   positivity
+
+/-! ### Function application -/
+
+section FunctionApplication
+
+variable {X : Type*}
+
+example (x : X) : 0 ≤ (1 : X → ℝ) x := by positivity
+example (x : X) : 0 ≤ (0 : X → ℝ) x := by positivity
+variable {Y : Type*}
+example (x : X) (y : Y) : 0 ≤ (1 : X → Y → ℝ) x y := by positivity
+
+end FunctionApplication
