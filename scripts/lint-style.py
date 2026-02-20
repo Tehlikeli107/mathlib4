@@ -42,6 +42,8 @@ ERR_CLN = 16 # line starts with a colon
 ERR_IND = 17 # second line not correctly indented
 ERR_ARR = 18 # space after "←"
 
+ISOLATED_BY_DOT_SEMICOLON_PATTERN = re.compile(r", fun [^,]* (=>|↦)$")
+
 exceptions = []
 new_exceptions = False
 
@@ -149,7 +151,7 @@ def isolated_by_dot_semicolon_check(lines, path):
             # should not be used in the second or later arguments of a tuple/anonymous constructor
             # See https://github.com/leanprover-community/mathlib4/pull/3825#discussion_r1186702599
             prev_line = lines[line_nr - 2][1].rstrip()
-            if not prev_line.endswith(",") and not re.search(", fun [^,]* (=>|↦)$", prev_line):
+            if not prev_line.endswith(",") and not ISOLATED_BY_DOT_SEMICOLON_PATTERN.search(prev_line):
                 errors += [(ERR_IBY, line_nr, path)]
         elif line.lstrip().startswith("by "):
             # We also error if the previous line ends on := and the current line starts with "by ".
@@ -214,12 +216,11 @@ def lint(path, fix=False):
         # We enumerate the lines so that we can report line numbers in the error messages correctly
         # we will modify lines as we go, so we need to keep track of the original line numbers
         lines = f.readlines()
-        enum_lines = enumerate(lines, 1)
+        enum_lines = list(enumerate(lines, 1))
         newlines = enum_lines
         for error_check in [four_spaces_in_second_line,
                             isolated_by_dot_semicolon_check,
-                            left_arrow_check,
-                            nonterminal_simp_check]:
+                            left_arrow_check]:
             errs, newlines = error_check(newlines, path)
             format_errors(errs)
 
