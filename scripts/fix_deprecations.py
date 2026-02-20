@@ -25,9 +25,14 @@ def main() -> None:
     warnings_by_file = defaultdict(list)
     skipped_files = set()
 
+    # Pre-compile regexes
+    path_regex = re.compile(r'([^:]+\.lean):(\d+):(\d+):')
+    old_regex = re.compile(r'`([^`]+)` has been deprecated')
+    new_regex = re.compile(r'Use `([^`]+)` instead')
+
     for line in output.split('\n'):
         if 'warning:' in line and 'deprecated' in line:
-            match = re.search(r'([^:]+\.lean):(\d+):(\d+):', line)
+            match = path_regex.search(line)
             if match:
                 filepath = match.group(1).strip()  # Strip leading/trailing whitespace
                 line_num = int(match.group(2))
@@ -39,8 +44,8 @@ def main() -> None:
                     skipped_files.add(filepath)
                     continue
 
-                old_match = re.search(r'`([^`]+)` has been deprecated', line)
-                new_match = re.search(r'Use `([^`]+)` instead', line)
+                old_match = old_regex.search(line)
+                new_match = new_regex.search(line)
 
                 if old_match and new_match:
                     old_name = old_match.group(1)
