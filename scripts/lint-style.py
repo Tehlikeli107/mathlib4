@@ -208,13 +208,16 @@ def format_errors(errors):
         if errno == ERR_ARR:
             output_message(path, line_nr, "ERR_ARR", "Missing space after '←'.")
 
+def nonterminal_simp_check(lines, path):
+    return [], lines
+
 def lint(path, fix=False):
     global new_exceptions
     with path.open(encoding="utf-8", newline="") as f:
         # We enumerate the lines so that we can report line numbers in the error messages correctly
         # we will modify lines as we go, so we need to keep track of the original line numbers
         lines = f.readlines()
-        enum_lines = enumerate(lines, 1)
+        enum_lines = list(enumerate(lines, 1))
         newlines = enum_lines
         for error_check in [four_spaces_in_second_line,
                             isolated_by_dot_semicolon_check,

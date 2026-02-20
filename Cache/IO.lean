@@ -208,13 +208,23 @@ def validateCurl : IO Bool := do
       let _ := @leOfOrd
       if version >= (7, 81) then return true
       -- TODO: support more platforms if the need arises
-      let arch ← (·.trimAscii.copy) <$> runCmd "uname" #["-m"] false
-      let kernel ← (·.trimAscii.copy) <$> runCmd "uname" #["-s"] false
-      if kernel == "Linux" && arch ∈ ["x86_64", "aarch64"] then
+      let target : Option String ← if System.Platform.isWindows then
+        pure none
+      else if System.Platform.getIsOSX () then
+        pure none
+      else
+        let kernel ← (·.trimAscii.copy) <$> runCmd "uname" #["-s"] false
+        let arch ← (·.trimAscii.copy) <$> runCmd "uname" #["-m"] false
+        if kernel == "Linux" && arch ∈ ["x86_64", "aarch64"] then
+          pure <| some s!"{arch}-linux"
+        else
+          pure none
+
+      if let some target := target then
         IO.println s!"curl is too old; downloading more recent version"
         IO.FS.createDirAll IO.CACHEDIR
         let _ ← runCmd "curl" (stderrAsErr := false) #[
-          s!"https://github.com/leanprover-community/static-curl/releases/download/v{CURLVERSION}/curl-{arch}-linux-static",
+          s!"https://github.com/leanprover-community/static-curl/releases/download/v{CURLVERSION}/curl-{target}-static",
           "-L", "-o", CURLBIN.toString]
         let _ ← runCmd "chmod" #["u+x", CURLBIN.toString]
         return true
