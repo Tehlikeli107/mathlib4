@@ -42,6 +42,8 @@ ERR_CLN = 16 # line starts with a colon
 ERR_IND = 17 # second line not correctly indented
 ERR_ARR = 18 # space after "←"
 
+LEFT_ARROW_PATTERN = re.compile(r'←(?:(?=``?\()|(?![%`]))(\S)')
+
 exceptions = []
 new_exceptions = False
 
@@ -179,7 +181,7 @@ def left_arrow_check(lines, path):
             continue
         # Allow "←" to be followed by "%" or "`", but not by "`(" or "``(" (since "`()" and "``()"
         # are used for syntax quotations). Otherwise, insert a space after "←".
-        new_line = re.sub(r'←(?:(?=``?\()|(?![%`]))(\S)', r'← \1', line)
+        new_line = LEFT_ARROW_PATTERN.sub(r'← \1', line)
         if new_line != line:
             errors += [(ERR_ARR, line_nr, path)]
         newlines.append((line_nr, new_line))
@@ -214,7 +216,7 @@ def lint(path, fix=False):
         # We enumerate the lines so that we can report line numbers in the error messages correctly
         # we will modify lines as we go, so we need to keep track of the original line numbers
         lines = f.readlines()
-        enum_lines = enumerate(lines, 1)
+        enum_lines = list(enumerate(lines, 1))
         newlines = enum_lines
         for error_check in [four_spaces_in_second_line,
                             isolated_by_dot_semicolon_check,
@@ -228,11 +230,12 @@ def lint(path, fix=False):
         path.with_name(path.name + '.bak').write_text("".join(l for _, l in newlines), encoding = "utf8")
         shutil.move(path.with_name(path.name + '.bak'), path)
 
-fix = "--fix" in sys.argv
-argv = (arg for arg in sys.argv[1:] if arg != "--fix")
+if __name__ == "__main__":
+    fix = "--fix" in sys.argv
+    argv = (arg for arg in sys.argv[1:] if arg != "--fix")
 
-for filename in argv:
-    lint(Path(filename), fix=fix)
+    for filename in argv:
+        lint(Path(filename), fix=fix)
 
-if new_exceptions:
-    exit(1)
+    if new_exceptions:
+        exit(1)
