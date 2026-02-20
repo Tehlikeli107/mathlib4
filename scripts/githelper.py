@@ -391,8 +391,14 @@ def cmd_fix_update_remote(
     target: str,
     target_url: str,
     allowed_urls: set[str],
+    valid_urls: set[str] | None = None,
 ) -> None:
     allowed_urls = allowed_urls | {target_url}
+    if valid_urls is None:
+        valid_urls = allowed_urls
+    else:
+        valid_urls = valid_urls | allowed_urls
+
     remotes = git_get_remotes()
 
     url = remotes.get(remote)
@@ -401,11 +407,21 @@ def cmd_fix_update_remote(
 
     # Delete remote if it points to the wrong place.
     if url is not None:
-        print_warn(f"Remote {remote!r} does not point to {target}.")
-        if not ask_yes_no(f"Delete and replace remote {remote!r}?"):
-            abort(f"Remote {remote!r} must point to {target}.")
-        git_remove_remote(remote)
-        remotes = git_get_remotes()
+        if url in valid_urls:
+            print_info(
+                f"Remote {remote!r} points to {target} but uses a non-preferred URL."
+            )
+            if ask_yes_no(f"Update remote {remote!r} to {target_url!r}?"):
+                git_remove_remote(remote)
+                remotes = git_get_remotes()
+            else:
+                return
+        else:
+            print_warn(f"Remote {remote!r} does not point to {target}.")
+            if not ask_yes_no(f"Delete and replace remote {remote!r}?"):
+                abort(f"Remote {remote!r} must point to {target}.")
+            git_remove_remote(remote)
+            remotes = git_get_remotes()
 
     # Try to find and rename a remote that already points to the correct place.
     for name, url in remotes.items():
@@ -454,11 +470,21 @@ def cmd_fix_create_new_fork() -> None:
     gh_fork()
 
 
-def cmd_fix_update_origin_to_fork(fork: str) -> None:
+def cmd_fix_update_origin_to_fork(fork: str, https_origin: bool = False) -> None:
     fork_ssh = ssh_url(fork)
     fork_http = http_url(fork)
     fork_urls = {fork_ssh, fork_http}
-    cmd_fix_update_remote(ORIGIN, "your fork of mathlib", fork_ssh, fork_urls)
+
+    if https_origin:
+        target_url = fork_http
+        allowed_urls = {fork_http}
+    else:
+        target_url = fork_ssh
+        allowed_urls = fork_urls
+
+    cmd_fix_update_remote(
+        ORIGIN, "your fork of mathlib", target_url, allowed_urls, valid_urls=fork_urls
+    )
 
 
 def cmd_fix_update_master_remotes() -> None:
@@ -487,7 +513,15 @@ def cmd_fix(args: argparse.Namespace) -> None:
     username = gh_get_username()
 
     print_step(1, f"Remote {UPSTREAM!r} should point to mathlib.")
-    cmd_fix_update_remote(UPSTREAM, "mathlib", MATHLIB_HTTP_URL, MATHLIB_URLS)
+    if args.upstream_ssh:
+        upstream_url = MATHLIB_SSH_URL
+        upstream_allowed = {MATHLIB_SSH_URL}
+    else:
+        upstream_url = MATHLIB_HTTP_URL
+        upstream_allowed = MATHLIB_URLS
+    cmd_fix_update_remote(
+        UPSTREAM, "mathlib", upstream_url, upstream_allowed, valid_urls=MATHLIB_URLS
+    )
 
     print_step(2, "Default gh repo should point to mathlib.")
     cmd_fix_update_default_gh_repo()
@@ -500,7 +534,7 @@ def cmd_fix(args: argparse.Namespace) -> None:
         cmd_fix_create_new_fork()
     else:
         print_info(f"Found a mathlib fork at {fork}.")
-        cmd_fix_update_origin_to_fork(fork)
+        cmd_fix_update_origin_to_fork(fork, args.origin_https)
 
     print_step(4, "Updating remotes...")
     git_fetch_all()
@@ -563,14 +597,22 @@ def cmd_prune(args: argparse.Namespace) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    # TODO --origin-https option?
-    # TODO --upstream-ssh option?
 
     subparsers = parser.add_subparsers(required=True)
 
     p_fix = subparsers.add_parser(
         "fix",
         help="fix your git repo setup",
+    )
+    p_fix.add_argument(
+        "--origin-https",
+        action="store_true",
+        help="Use HTTPS for origin remote",
+    )
+    p_fix.add_argument(
+        "--upstream-ssh",
+        action="store_true",
+        help="Use SSH for upstream remote",
     )
     p_fix.set_defaults(cmd=cmd_fix)
 
