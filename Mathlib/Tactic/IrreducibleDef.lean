@@ -72,42 +72,42 @@ Introduces an irreducible definition.
 a constant `foo : Nat` as well as
 a theorem `foo_def : foo = 42`.
 -/
-elab mods:declModifiers "irreducible_def" n_id:declId n_def:(irredDefLemma)?
-    declSig:ppIndent(optDeclSig) val:declVal :
-    command => do
-  let declSig : TSyntax ``Parser.Command.optDeclSig := ⟨declSig.raw⟩ -- HACK
-  let (n, us) ← match n_id with
-    | `(Parser.Command.declId| $n:ident $[.{$us,*}]?) => pure (n, us)
-    | _ => throwUnsupportedSyntax
-  let us' := us.getD { elemsAndSeps := #[] }
-  let n_def ← match n_def.getD ⟨mkNullNode⟩ with
-    | `(irredDefLemma| (lemma := $id)) => pure id
-    | _ => pure <| mkIdentFrom n <| (·.review) <|
-      let scopes := extractMacroScopes n.getId
-      { scopes with name := scopes.name.appendAfter "_def" }
-  let `(Parser.Command.declModifiersF|
-      $[$doc:docComment]? $[@[$attrs,*]]?
-      $[$vis]? $[$prot:protected]? $[$nc:noncomputable]? $[$uns:unsafe]?) := mods
-    | throwError "unsupported modifiers {format mods}"
-  let attrs := attrs.getD {}
-  let priv := vis.filter (· matches `(Parser.Command.visibility| private))
-  elabCommand <|<- `(stop_at_first_error
-    $[$nc:noncomputable]? $[$uns]? def definition$[.{$us,*}]? $declSig:optDeclSig $val
-    $[$nc:noncomputable]? $[$uns]? opaque wrapped$[.{$us,*}]? : Subtype (Eq @definition.{$us',*}) :=
-      ⟨_, rfl⟩
-    $[$doc:docComment]? $[private%$priv]? $[$nc:noncomputable]? $[$uns]?
-    def $n:ident$[.{$us,*}]? :=
-      val_proj @wrapped.{$us',*}
-    $[private%$priv]? $[$uns:unsafe]? theorem $n_def:ident $[.{$us,*}]? :
-        eta_helper Eq @$n.{$us',*} @(delta% @definition) := by
-      intros
-      delta $n:ident
-      rw [show wrapped = ⟨@definition.{$us',*}, rfl⟩ from Subtype.ext wrapped.2.symm]
-      rfl
-    attribute [irreducible] $n definition
-    attribute [eqns $n_def] $n
-    attribute [$attrs:attrInstance,*] $n)
-  if prot.isSome then
-    modifyEnv (addProtected · ((← getCurrNamespace) ++ n.getId))
+syntax (name := irreducibleDef) declModifiers "irreducible_def" declId (irredDefLemma)? ppIndent(optDeclSig) declVal : command
+
+elab_rules : command
+  | `($mods:declModifiers irreducible_def $n_id:declId $[$n_def:irredDefLemma]? $declSig:optDeclSig $val:declVal) => do
+    let (n, us) ← match n_id with
+      | `(Parser.Command.declId| $n:ident $[.{$us,*}]?) => pure (n, us)
+      | _ => throwUnsupportedSyntax
+    let us' := us.getD { elemsAndSeps := #[] }
+    let n_def ← match n_def with
+      | some `(irredDefLemma| (lemma := $id)) => pure id
+      | _ => pure <| mkIdentFrom n <| (·.review) <|
+        let scopes := extractMacroScopes n.getId
+        { scopes with name := scopes.name.appendAfter "_def" }
+    let `(Parser.Command.declModifiersF|
+        $[$doc:docComment]? $[@[$attrs,*]]?
+        $[$vis]? $[$prot:protected]? $[$nc:noncomputable]? $[$uns:unsafe]?) := mods
+      | throwError "unsupported modifiers {format mods}"
+    let attrs := attrs.getD {}
+    let priv := vis.filter (· matches `(Parser.Command.visibility| private))
+    elabCommand <|<- `(stop_at_first_error
+      $[$nc:noncomputable]? $[$uns]? def definition$[.{$us,*}]? $declSig:optDeclSig $val
+      $[$nc:noncomputable]? $[$uns]? opaque wrapped$[.{$us,*}]? : Subtype (Eq @definition.{$us',*}) :=
+        ⟨_, rfl⟩
+      $[$doc:docComment]? $[private%$priv]? $[$nc:noncomputable]? $[$uns]?
+      def $n:ident$[.{$us,*}]? :=
+        val_proj @wrapped.{$us',*}
+      $[private%$priv]? $[$uns:unsafe]? theorem $n_def:ident $[.{$us,*}]? :
+          eta_helper Eq @$n.{$us',*} @(delta% @definition) := by
+        intros
+        delta $n:ident
+        rw [show wrapped = ⟨@definition.{$us',*}, rfl⟩ from Subtype.ext wrapped.2.symm]
+        rfl
+      attribute [irreducible] $n definition
+      attribute [eqns $n_def] $n
+      attribute [$attrs:attrInstance,*] $n)
+    if prot.isSome then
+      modifyEnv (addProtected · ((← getCurrNamespace) ++ n.getId))
 
 end Lean.Elab.Command
