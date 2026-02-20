@@ -185,6 +185,16 @@ def left_arrow_check(lines, path):
         newlines.append((line_nr, new_line))
     return errors, newlines
 
+
+def nonterminal_simp_check(lines, path):
+    """Compatibility no-op for legacy invocation order.
+
+    The nonterminal `simp` check now lives in `scripts/lint-style.lean`.
+    Keep this shim so `lint-style.py` can still be run directly without
+    failing with a NameError.
+    """
+    return [], lines
+
 def output_message(path, line_nr, code, msg):
     # We are outputting for github. We duplicate path, line_nr and code,
     # so that they are also visible in the plaintext output.
@@ -214,7 +224,7 @@ def lint(path, fix=False):
         # We enumerate the lines so that we can report line numbers in the error messages correctly
         # we will modify lines as we go, so we need to keep track of the original line numbers
         lines = f.readlines()
-        enum_lines = enumerate(lines, 1)
+        enum_lines = list(enumerate(lines, 1))
         newlines = enum_lines
         for error_check in [four_spaces_in_second_line,
                             isolated_by_dot_semicolon_check,
