@@ -14,16 +14,14 @@ import subprocess
 import re
 from collections import defaultdict
 from pathlib import Path
+from typing import Dict, List, Tuple, Any
 
-def main() -> None:
-    # Run lake build --no-build ONCE to collect warnings without building
-    print("Running lake build --no-build to collect deprecation warnings...")
-    result = subprocess.run(['lake', 'build', '--no-build'], capture_output=True, text=True)
-    output = result.stdout + result.stderr
-
-    # Parse warnings
+def parse_warnings(output: str) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Parses `lake build` output to extract deprecation warnings.
+    Returns a dictionary mapping filepaths to a list of warning details.
+    """
     warnings_by_file = defaultdict(list)
-    skipped_files = set()
 
     for line in output.split('\n'):
         if 'warning:' in line and 'deprecated' in line:
@@ -32,12 +30,6 @@ def main() -> None:
                 filepath = match.group(1).strip()  # Strip leading/trailing whitespace
                 line_num = int(match.group(2))
                 col_num = int(match.group(3))
-
-                # Skip if file doesn't exist locally
-                # This may occur e.g. for deprecations warnings inside upstream dependencies.
-                if not Path(filepath).exists():
-                    skipped_files.add(filepath)
-                    continue
 
                 old_match = re.search(r'`([^`]+)` has been deprecated', line)
                 new_match = re.search(r'Use `([^`]+)` instead', line)
@@ -51,6 +43,76 @@ def main() -> None:
                         'old': old_name,
                         'new': new_name,
                     })
+    return warnings_by_file
+
+def fix_file_content(lines: List[str], warnings: List[Dict[str, Any]]) -> Tuple[List[str], int, List[Tuple], List[str]]:
+    """
+    Applies deprecation fixes to a list of lines based on warnings.
+    Returns:
+        - modified lines
+        - number of changes made
+        - list of skipped warnings (line, col, old_name, reason)
+        - list of log messages for successful changes
+    """
+    total_changes = 0
+    skipped = []
+    logs = []
+
+    # Sort by position (reverse order to avoid offset issues)
+    # We create a copy of warnings to avoid modifying the input list in place if reused
+    sorted_warnings = sorted(warnings, key=lambda w: (w['line'], w['col']), reverse=True)
+
+    for warning in sorted_warnings:
+        line_num = warning['line'] - 1  # Lean uses 1-indexed lines
+        col_num = warning['col']        # Lean uses 0-indexed columns
+        old_name = warning['old']
+        new_name = warning['new']
+
+        if line_num >= len(lines):
+            skipped.append((line_num + 1, col_num, old_name, "out of range"))
+            continue
+
+        line = lines[line_num]
+
+        # Try progressively shorter versions by removing namespace prefixes.
+        # E.g., for "Fin.lt_iff_val_lt_val", try "Fin.lt_iff_val_lt_val", then "lt_iff_val_lt_val".
+        old_parts = old_name.split('.')
+        new_parts = new_name.split('.')
+
+        replaced = False
+        for i in range(len(old_parts)):
+            old_suffix = '.'.join(old_parts[i:])
+            new_suffix = '.'.join(new_parts[i:]) if i < len(new_parts) else new_name
+
+            if line[col_num:col_num+len(old_suffix)] == old_suffix:
+                lines[line_num] = line[:col_num] + new_suffix + line[col_num+len(old_suffix):]
+                logs.append(f"  Line {line_num + 1}, col {col_num}: {old_suffix} → {new_suffix}")
+                total_changes += 1
+                replaced = True
+                break
+
+        if not replaced:
+            actual = line[col_num:col_num+20]
+            skipped.append((line_num + 1, col_num, old_name, actual))
+
+    return lines, total_changes, skipped, logs
+
+def main() -> None:
+    # Run lake build --no-build ONCE to collect warnings without building
+    print("Running lake build --no-build to collect deprecation warnings...")
+    result = subprocess.run(['lake', 'build', '--no-build'], capture_output=True, text=True)
+    output = result.stdout + result.stderr
+
+    all_warnings = parse_warnings(output)
+
+    warnings_by_file = {}
+    skipped_files = set()
+
+    for filepath, warnings in all_warnings.items():
+        if not Path(filepath).exists():
+            skipped_files.add(filepath)
+        else:
+            warnings_by_file[filepath] = warnings
 
     total_warnings = sum(len(w) for w in warnings_by_file.values())
     print(f"Found {total_warnings} warnings in {len(warnings_by_file)} files")
@@ -59,7 +121,7 @@ def main() -> None:
     print()
 
     files_changed = total_changes = 0
-    skipped = []
+    all_skipped = []
 
     for filepath, warnings in sorted(warnings_by_file.items()):
         print(filepath)
@@ -67,58 +129,31 @@ def main() -> None:
         with open(filepath, 'r') as f:
             lines = f.readlines()
 
-        # Sort by position (reverse order to avoid offset issues)
-        warnings.sort(key=lambda w: (w['line'], w['col']), reverse=True)
+        new_lines, changes, skipped, logs = fix_file_content(lines, warnings)
 
-        made_changes = False
+        for log in logs:
+            print(log)
 
-        for warning in warnings:
-            line_num = warning['line'] - 1  # Lean uses 1-indexed lines
-            col_num = warning['col']        # Lean uses 0-indexed columns
-            old_name = warning['old']
-            new_name = warning['new']
-
-            if line_num >= len(lines):
-                print(f"  ⚠ Line {line_num + 1}, col {col_num}: Out of range")
-                skipped.append((filepath, line_num + 1, col_num, old_name, "out of range"))
-                continue
-
-            line = lines[line_num]
-
-            # Try progressively shorter versions by removing namespace prefixes.
-            # E.g., for "Fin.lt_iff_val_lt_val", try "Fin.lt_iff_val_lt_val", then "lt_iff_val_lt_val".
-            old_parts = old_name.split('.')
-            new_parts = new_name.split('.')
-
-            replaced = False
-            for i in range(len(old_parts)):
-                old_suffix = '.'.join(old_parts[i:])
-                new_suffix = '.'.join(new_parts[i:]) if i < len(new_parts) else new_name
-
-                if line[col_num:col_num+len(old_suffix)] == old_suffix:
-                    lines[line_num] = line[:col_num] + new_suffix + line[col_num+len(old_suffix):]
-                    print(f"  Line {line_num + 1}, col {col_num}: {old_suffix} → {new_suffix}")
-                    made_changes = True
-                    total_changes += 1
-                    replaced = True
-                    break
-
-            if not replaced:
-                actual = line[col_num:col_num+20]
-                print(f"  ⚠ Line {line_num + 1}, col {col_num}: Expected '{old_name}', found '{actual}...'")
-                skipped.append((filepath, line_num + 1, col_num, old_name, actual))
-
-        if made_changes:
-            with open(filepath, 'w') as f:
-                f.writelines(lines)
+        if changes > 0:
             files_changed += 1
+            total_changes += changes
+            with open(filepath, 'w') as f:
+                f.writelines(new_lines)
+
+        for line_num, col_num, old_name, actual in skipped:
+             if actual == "out of range":
+                 print(f"  ⚠ Line {line_num}, col {col_num}: Out of range")
+             else:
+                 print(f"  ⚠ Line {line_num}, col {col_num}: Expected '{old_name}', found '{actual}...'")
+
+        all_skipped.extend([(filepath, *s) for s in skipped])
 
         print()
 
     print("="*80)
     print(f"Changed {total_changes} deprecations in {files_changed} files")
-    if skipped:
-        print(f"Skipped {len(skipped)} warnings (could not find exact match at position)")
+    if all_skipped:
+        print(f"Skipped {len(all_skipped)} warnings (could not find exact match at position)")
     print("="*80)
 
 if __name__ == '__main__':
