@@ -393,10 +393,7 @@ theorem Trivialization.contMDiffOn_symm_trans :
   refine (contMDiffOn_fst.prodMk
     (contMDiffOn_fst.coordChange contMDiffOn_snd Hmaps.1 Hmaps.2)).congr ?_
   rintro ⟨b, x⟩ hb
-  refine Prod.ext ?_ rfl
-  have : (e.toOpenPartialHomeomorph.symm (b, x)).1 ∈ e'.baseSet := by
-    simp_all only [Trivialization.mem_target, mfld_simps]
-  exact (e'.coe_fst' this).trans (e.proj_symm_apply hb.1)
+  exact (e.mk_coordChange e' (Hmaps.1 hb) (Hmaps.2 hb) x).symm
 
 variable {e e'}
 
