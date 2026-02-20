@@ -14,6 +14,9 @@ def get_imports(directory):
     # Initialize an empty dictionary
     file_imports = {}
 
+    # Compile the regex pattern
+    import_re = re.compile(r'^(public )?import\s+(?P<ref>.*)')
+
     # Iterate over all Lean files in the given directory
     for root, _, files in os.walk(directory):
         for file in files:
@@ -32,7 +35,7 @@ def get_imports(directory):
                         if '/-!' in line:
                             break
                         # Find an import statement
-                        match = re.match(r'^(public )?import\s+(?P<ref>.*)', line)
+                        match = import_re.match(line)
                         if match:
                             imports.append(match.groupdict()['ref'])
 
@@ -76,16 +79,17 @@ def count_transitive_imports(transitive_imports):
 
     return count_imports
 
-# Check if the directory name is provided as a command line argument
-if len(sys.argv) < 2:
-    print("Please provide the directory name as a command line argument.")
-    sys.exit(1)
+if __name__ == "__main__":
+    # Check if the directory name is provided as a command line argument
+    if len(sys.argv) < 2:
+        print("Please provide the directory name as a command line argument.")
+        sys.exit(1)
 
-# Get the directory name from the command line argument
-directory = sys.argv[1]
+    # Get the directory name from the command line argument
+    directory = sys.argv[1]
 
-# Compute the counts
-counts = count_transitive_imports(get_transitive_imports(get_imports(directory)))
+    # Compute the counts
+    counts = count_transitive_imports(get_transitive_imports(get_imports(directory)))
 
-# Print the counts in JSON format
-print(json.dumps(counts))
+    # Print the counts in JSON format
+    print(json.dumps(counts))
