@@ -521,16 +521,16 @@ def lookup (hashMap : ModuleHashMap) (modules : List Name) : IO Unit := do
 
 /--
 Parse a string as either a path or a Lean module name.
-TODO: If the argument describes a folder, use `walkDir` to find all `.lean` files within.
+If the argument describes a folder, uses `walkDir` to find all `.lean` files within.
 
 Return tuples of the form ("module name", "path to .lean file").
 
 The input string `arg` takes one of the following forms:
 
 1. `Mathlib.Algebra.Field.Basic`: there exists such a Lean file
-2. `Mathlib.Algebra.Field`: no Lean file exists but a folder (TODO)
+2. `Mathlib.Algebra.Field`: no Lean file exists but a folder
 3. `Mathlib/Algebra/Field/Basic.lean`: the file exists (note potentially `\` on Windows)
-4. `Mathlib/Algebra/Field/`: the folder exists (TODO)
+4. `Mathlib/Algebra/Field/`: the folder exists
 
 Not supported yet:
 
@@ -558,7 +558,11 @@ def leanModulesFromSpec (sp : SearchPath) (argₛ : String) :
       return .ok #[(mod, arg)]
     else
       -- (4.) provided existing directory: walk it
-      return .error "Searching lean files in a folder is not supported yet!"
+      let files ← getFilesWithExtension arg "lean"
+      let mods := files.map fun file =>
+        let mod := file.withExtension "" |>.components.foldl .str .anonymous
+        (mod, file)
+      return .ok mods
   else
     -- provided a module
     let mod := argₛ.toName
@@ -574,13 +578,15 @@ def leanModulesFromSpec (sp : SearchPath) (argₛ : String) :
       -- does not correspond to a Lean file, but to an existing folder
       -- `Mathlib/Data/`
       let folder := sourceFile.withExtension ""
-      IO.println s!"Searching directory {folder} for .lean files"
       if ← folder.pathExists then
         -- (2.) provided "module name" of an existing folder: walk dir
-        -- TODO: will be implemented in https://github.com/leanprover-community/mathlib4/issues/21838
-        return .error "Entering a part of a module name \
-          (i.e. `Mathlib.Data` when only the folder `Mathlib/Data/` but no \
-          file `Mathlib/Data.lean` exists) is not supported yet!"
+        IO.println s!"Searching directory {folder} for .lean files"
+        let files ← getFilesWithExtension folder "lean"
+        let mods := files.map fun file =>
+          let suffix := file.withoutParent folder
+          let suffixMod := suffix.withExtension "" |>.components.foldl .str .anonymous
+          (mod ++ suffixMod, file)
+        return .ok mods
       else
         return .error s!"Invalid argument: non-existing module {mod}"
 
