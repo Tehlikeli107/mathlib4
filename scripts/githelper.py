@@ -22,7 +22,7 @@ def ssh_url(repo: str) -> str:
 
 
 def from_url(url: str) -> str | None:
-    regex = r"(?:https://github\.com/|git@github\.com/)(.*)\.git"
+    regex = r"(?:https://github\.com/|git@github\.com[:/])(.*)\.git"
     if match := re.fullmatch(regex, url):
         return match.group(1)
 

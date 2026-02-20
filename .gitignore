@@ -4,3 +4,5 @@
 .cache
 # `lake` stores its files here:
 .lake
+__pycache__/
+*.pyc
