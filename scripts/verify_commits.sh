@@ -280,9 +280,47 @@ verify_auto_commit() {
   local untracked_before
   untracked_before=$(git ls-files --others --exclude-standard | sort)
 
-  # Run command with timeout
+  # Validate command to prevent RCE
+  if [[ -z "$command" ]]; then
+    AUTO_RESULTS["$commit"]="Empty command"
+    log_error "Auto commit $short_sha: empty command"
+    return 1
+  fi
+
+  # Allow only alphanumeric, spaces, and safe punctuation . / _ @ = -
+  local safe_chars='a-zA-Z0-9 ._/@=-'
+  if [[ -n "${command//[$safe_chars]/}" ]]; then
+    AUTO_RESULTS["$commit"]="Command contains forbidden characters"
+    log_error "Auto commit $short_sha: command contains forbidden characters"
+    return 1
+  fi
+
+  # Whitelist of allowed command prefixes
+  local allowed=false
+  local prefixes=(
+    "scripts/auto_commit.sh "
+    "lake exe "
+    "./scripts/"
+    "python3 scripts/"
+  )
+  for prefix in "${prefixes[@]}"; do
+    if [[ "$command" == "$prefix"* ]]; then
+      allowed=true
+      break
+    fi
+  done
+
+  if [[ "$allowed" == "false" ]]; then
+    AUTO_RESULTS["$commit"]="Command prefix not whitelisted"
+    log_error "Auto commit $short_sha: command prefix not whitelisted"
+    return 1
+  fi
+
+  # Run command with timeout using an array to avoid shell interpretation
+  local cmd_array
+  read -r -a cmd_array <<< "$command"
   local cmd_exit=0
-  timeout "$TIMEOUT_SECONDS" bash -c "$command" || cmd_exit=$?
+  timeout "$TIMEOUT_SECONDS" "${cmd_array[@]}" || cmd_exit=$?
 
   if [[ $cmd_exit -eq 124 ]]; then
     AUTO_RESULTS["$commit"]="Command timed out after ${TIMEOUT_SECONDS}s"

@@ -61,7 +61,8 @@ log_info "Running: $COMMAND"
 
 # Run the command
 cmd_exit=0
-bash -c "$COMMAND" || cmd_exit=$?
+# Use "$@" instead of bash -c to avoid shell injection and properly handle arguments
+"$@" || cmd_exit=$?
 
 if [[ $cmd_exit -ne 0 ]]; then
   log_error "Command failed with exit code $cmd_exit"
