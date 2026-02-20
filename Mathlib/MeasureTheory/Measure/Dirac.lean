@@ -336,8 +336,7 @@ lemma ae_mem_finset_iff : (∀ᵐ a ∂μ, a ∈ s) ↔ μ = ∑ a ∈ s, μ {a}
 
 lemma ae_eq_or_eq_iff_eq_dirac_add_dirac (ha : a₁ ≠ a₂) :
     (∀ᵐ a ∂μ, a = a₁ ∨ a = a₂) ↔ μ = μ {a₁} • .dirac a₁ + μ {a₂} • .dirac a₂ := by
-  -- FIXME: Why does `simpa using ...` not work?
-  convert ae_mem_finset_iff (s := .cons a₁ {a₂} <| by simpa) <;> simp
+  simpa [ha] using ae_mem_finset_iff (s := {a₁, a₂})
 
 lemma ae_mem_finset_iff_map_eq_sum_dirac {μ : Measure β} (hf : AEMeasurable f μ) :
     (∀ᵐ b ∂μ, f b ∈ s) ↔ μ.map f = ∑ a ∈ s, μ (f ⁻¹' {a}) • .dirac a := by
@@ -348,7 +347,6 @@ lemma ae_eq_or_eq_iff_map_eq_dirac_add_dirac {μ : Measure β} (hf : AEMeasurabl
     (ha : a₁ ≠ a₂) :
     (∀ᵐ b ∂μ, f b = a₁ ∨ f b = a₂) ↔
       μ.map f = μ (f ⁻¹' {a₁}) • .dirac a₁ + μ (f ⁻¹' {a₂}) • .dirac a₂ := by
-  -- FIXME: Why does `simpa using ...` not work?
-  convert ae_mem_finset_iff_map_eq_sum_dirac (s := .cons a₁ {a₂} <| by simpa) hf <;> simp
+  simpa [ha] using ae_mem_finset_iff_map_eq_sum_dirac (s := {a₁, a₂}) hf
 
 end MeasureTheory.Measure
