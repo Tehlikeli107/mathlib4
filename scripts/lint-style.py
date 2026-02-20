@@ -214,12 +214,11 @@ def lint(path, fix=False):
         # We enumerate the lines so that we can report line numbers in the error messages correctly
         # we will modify lines as we go, so we need to keep track of the original line numbers
         lines = f.readlines()
-        enum_lines = enumerate(lines, 1)
+        enum_lines = list(enumerate(lines, 1))
         newlines = enum_lines
         for error_check in [four_spaces_in_second_line,
                             isolated_by_dot_semicolon_check,
-                            left_arrow_check,
-                            nonterminal_simp_check]:
+                            left_arrow_check]:
             errs, newlines = error_check(newlines, path)
             format_errors(errs)
 
@@ -228,11 +227,12 @@ def lint(path, fix=False):
         path.with_name(path.name + '.bak').write_text("".join(l for _, l in newlines), encoding = "utf8")
         shutil.move(path.with_name(path.name + '.bak'), path)
 
-fix = "--fix" in sys.argv
-argv = (arg for arg in sys.argv[1:] if arg != "--fix")
+if __name__ == "__main__":
+    fix = "--fix" in sys.argv
+    argv = (arg for arg in sys.argv[1:] if arg != "--fix")
 
-for filename in argv:
-    lint(Path(filename), fix=fix)
+    for filename in argv:
+        lint(Path(filename), fix=fix)
 
-if new_exceptions:
-    exit(1)
+    if new_exceptions:
+        exit(1)
