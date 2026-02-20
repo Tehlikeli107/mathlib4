@@ -33,7 +33,6 @@ It keeps the mapping of the existing `α`-inhabitants intact, modulo `Fin.castSu
 instance instFinEnumOptionLast (α : Type u) [FinEnum α] : FinEnum (Option α) :=
   insertNone α (Fin.last _)
 
-open Fin.NatCast in -- TODO: refactor the proof to avoid needing this.
 /-- A recursor principle for finite-and-enumerable types, analogous to `Nat.rec`.
 It effectively says that every `FinEnum` is either `Empty` or `Option α`, up to an `Equiv` mediated
 by `Fin`s of equal cardinality.
@@ -57,7 +56,7 @@ def recEmptyOption {P : Type u → Sort v}
   | n + 1 =>
     let fN := ULift.instFinEnum (α := Fin n)
     have : card (ULift.{u} <| Fin n) = n := card_ulift.trans card_fin
-    congr (insertNone _ <| finChoice n) _
+    congr (insertNone _ <| Fin.cast (congrArg Nat.succ this.symm) (finChoice n)) _
       (cardeq.trans <| congrArg Nat.succ this.symm) <|
         option fN (recEmptyOption finChoice congr empty option _)
 termination_by card α
@@ -79,7 +78,6 @@ theorem recEmptyOption_of_card_eq_zero {P : Type u → Sort v}
   · congr 1; exact Subsingleton.allEq _ _
   · exact Nat.noConfusion <| h.symm.trans ‹_›
 
-open Fin.NatCast in -- TODO: refactor the proof to avoid needing this.
 /--
 For a type with positive `card`, the recursion principle evaluates to whatever
 `congr` makes of the step result, where `Option.none` has been inserted into the
@@ -92,7 +90,9 @@ theorem recEmptyOption_of_card_pos {P : Type u → Sort v}
     (option : {α : Type u} → FinEnum α → P α → P (Option α))
     (α : Type u) [FinEnum α] (h : 0 < card α) :
     recEmptyOption finChoice congr empty option α =
-      congr (insertNone _ <| finChoice (card α - 1)) ‹_›
+      congr (insertNone _ <|
+          Fin.cast (congrArg Nat.succ (card_ulift.trans card_fin).symm) (finChoice (card α - 1)))
+        ‹_›
         (congrArg (· + 1) card_fin |>.trans <| (card α).succ_pred_eq_of_pos h).symm
         (option ULift.instFinEnum <|
           recEmptyOption finChoice congr empty option (ULift.{u} <| Fin (card α - 1))) := by
