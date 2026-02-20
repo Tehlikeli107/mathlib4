@@ -93,8 +93,7 @@ instance functionField_isScalarTower [IrreducibleSpace X] (U : X.Opens) (x : U)
 
 noncomputable instance (R : CommRingCat.{u}) [IsDomain R] :
     Algebra R (Spec R).functionField :=
-  -- TODO: can we write this normally after the refactor finishes?
-  RingHom.toAlgebra <| by apply CommRingCat.Hom.hom; apply StructureSheaf.toStalk
+  (StructureSheaf.toStalk R (genericPoint (Spec R))).hom.toAlgebra
 
 set_option backward.isDefEq.respectTransparency false in
 @[simp]
