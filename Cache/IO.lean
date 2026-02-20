@@ -22,33 +22,9 @@ def LIBDIR : FilePath :=
 def IRDIR : FilePath :=
   ".lake" / "build" / "ir"
 
-/-- Determine if the package `mod` is part of the mathlib cache.
-
-TODO: write a better predicate. -/
-def isPartOfMathlibCache (mod : Name) : Bool := #[
-  `Mathlib,
-  `Batteries,
-  `Aesop,
-  `Cli,
-  `ImportGraph,
-  `LeanSearchClient,
-  `Plausible,
-  `Qq,
-  `ProofWidgets,
-  `Archive,
-  `Counterexamples,
-  `MathlibTest,
-  -- Allow PRs to upload oleans for Reap for testing.
-  `Requests,
-  `OpenAIClient,
-  `Reap,
-  -- Allow PRs to upload oleans for Canonical for testing.
-  `Canonical,
-  -- Allow PRs to upload oleans for LeanHammer for testing.
-  `Duper,
-  `Auto,
-  `PremiseSelection,
-  `Hammer].contains mod.getRoot
+/-- Determine if the package `mod` is part of the mathlib cache. -/
+def isPartOfMathlibCache (mod : Name) : Bool :=
+  !#[`Init, `Lean, `Lake].contains mod.getRoot
 
 /-- Target directory for caching -/
 initialize CACHEDIR : FilePath ← do
