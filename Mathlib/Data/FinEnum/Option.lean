@@ -79,7 +79,6 @@ theorem recEmptyOption_of_card_eq_zero {P : Type u → Sort v}
   · congr 1; exact Subsingleton.allEq _ _
   · exact Nat.noConfusion <| h.symm.trans ‹_›
 
-open Fin.NatCast in -- TODO: refactor the proof to avoid needing this.
 /--
 For a type with positive `card`, the recursion principle evaluates to whatever
 `congr` makes of the step result, where `Option.none` has been inserted into the
@@ -93,7 +92,7 @@ theorem recEmptyOption_of_card_pos {P : Type u → Sort v}
     (α : Type u) [FinEnum α] (h : 0 < card α) :
     recEmptyOption finChoice congr empty option α =
       congr (insertNone _ <| finChoice (card α - 1)) ‹_›
-        (congrArg (· + 1) card_fin |>.trans <| (card α).succ_pred_eq_of_pos h).symm
+        (congrArg Nat.succ card_fin |>.trans <| (card α).succ_pred_eq_of_pos h).symm
         (option ULift.instFinEnum <|
           recEmptyOption finChoice congr empty option (ULift.{u} <| Fin (card α - 1))) := by
   conv => lhs; unfold recEmptyOption
