@@ -107,8 +107,12 @@ def main (args : List String) : IO Unit := do
   if roots.isEmpty then do
     -- No arguments means to start from `Mathlib.lean`
     -- TODO: could change this to the default-target of a downstream project
-    let mod := `Mathlib
     let sp := (← read).srcSearchPath
+    let mut mod := `Mathlib
+    if let some rootPkg ← getRootPackageName then
+      let rootMod := toUpperCamelCase rootPkg
+      if (← Lean.SearchPath.findWithExtBase sp "lean" rootMod).isSome then
+        mod := rootMod
     let sourceFile ← Lean.findLean sp mod
     roots := roots.insert mod sourceFile
 

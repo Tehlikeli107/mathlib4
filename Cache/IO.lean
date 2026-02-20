@@ -519,6 +519,26 @@ def lookup (hashMap : ModuleHashMap) (modules : List Name) : IO Unit := do
       println! "  comment: {line}"
   if err then IO.Process.exit 1
 
+/-- Convert a lower-case hyphenated name (e.g. `my-project`) to a CamelCase name (e.g. `MyProject`). -/
+def toUpperCamelCase (n : Name) : Name :=
+  let s := n.toString
+  let parts := s.replace "-" "_" |>.splitOn "_"
+  parts.foldl (fun acc part => acc ++ part.capitalize) "" |>.toName
+
+/-- Get the root package name from `lake-manifest.json` in the current directory. -/
+def getRootPackageName : IO (Option Name) := do
+  let manifestPath := "lake-manifest.json"
+  if ← System.FilePath.pathExists manifestPath then
+    let content ← IO.FS.readFile manifestPath
+    match Lean.Json.parse content with
+    | .ok json =>
+      match json.getObjValAs? String "name" with
+      | .ok name => return some name.toName
+      | _ => return none
+    | _ => return none
+  else
+    return none
+
 /--
 Parse a string as either a path or a Lean module name.
 TODO: If the argument describes a folder, use `walkDir` to find all `.lean` files within.
