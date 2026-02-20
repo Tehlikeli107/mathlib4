@@ -72,10 +72,10 @@ Introduces an irreducible definition.
 a constant `foo : Nat` as well as
 a theorem `foo_def : foo = 42`.
 -/
-elab mods:declModifiers "irreducible_def" n_id:declId n_def:(irredDefLemma)?
-    declSig:ppIndent(optDeclSig) val:declVal :
-    command => do
-  let declSig : TSyntax ``Parser.Command.optDeclSig := ⟨declSig.raw⟩ -- HACK
+syntax (name := irreducibleDef) declModifiers "irreducible_def" declId (irredDefLemma)? ppIndent(optDeclSig) declVal : command
+
+elab_rules : command
+  | `($mods:declModifiers irreducible_def $n_id:declId $[$n_def:irredDefLemma]? $declSig:optDeclSig $val:declVal) => do
   let (n, us) ← match n_id with
     | `(Parser.Command.declId| $n:ident $[.{$us,*}]?) => pure (n, us)
     | _ => throwUnsupportedSyntax
