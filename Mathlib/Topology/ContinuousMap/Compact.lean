@@ -404,6 +404,11 @@ open TopologicalSpace
 variable {X : Type*} [TopologicalSpace X] [LocallyCompactSpace X]
 variable {E : Type*} [NormedAddCommGroup E] [CompleteSpace E]
 
+@[simp]
+theorem restrict_apply_coe {A : Type*} [SetLike A X] (f : C(X, E)) (s : A) (x : s) :
+    f.restrict (s : Set X) x = f x :=
+  rfl
+
 set_option backward.isDefEq.respectTransparency false in
 theorem summable_of_locally_summable_norm {ι : Type*} {F : ι → C(X, E)}
     (hF : ∀ K : Compacts X, Summable fun i => ‖(F i).restrict K‖) : Summable F := by
@@ -413,9 +418,7 @@ theorem summable_of_locally_summable_norm {ι : Type*} {F : ι → C(X, E)}
   have A : ∀ s : Finset ι, restrict K (∑ i ∈ s, F i) = ∑ i ∈ s, restrict K (F i) := by
     intro s
     ext1 x
-    -- TODO: there is a non-confluence problem in the lemmas here,
-    -- and `SetLike.coe_sort_coe` prevents `restrict_apply` from being used.
-    simp [-SetLike.coe_sort_coe]
+    simp
   simpa only [HasSum, A] using (hF K).of_norm
 
 end LocalNormalConvergence
