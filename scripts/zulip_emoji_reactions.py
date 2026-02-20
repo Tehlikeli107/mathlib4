@@ -44,7 +44,7 @@ try:
     LABELS_TO_KEEP = json.loads(LABELS_TO_KEEP)
     assert isinstance(LABELS_TO_KEEP, list)
     assert '' not in LABELS_TO_KEEP
-except:
+except (IndexError, json.JSONDecodeError, AssertionError):
     print(f"parsing LABELS_TO_KEEP failed; setting to empty list")
     # an empty list is a good default since we remove reactions if the label is `not in LABELS_TO_KEEP`
     LABELS_TO_KEEP = []
