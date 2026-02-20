@@ -93,6 +93,10 @@ class BuildOutputProcessor:
             self.BlockKind.ERROR: self.errors,
         }
 
+        # Pre-compile regexes for performance
+        self.progress_regex = re.compile(r'\[(\d+)/(\d+)\]')
+        self.file_info_regex = re.compile(r'\[(\d+)/(\d+)\]\s+(\S+)\s+([^\s]+)')
+
     def start_group(self, name: str):
         """Start a GitHub Actions log group"""
         print(f"::group::{name}", flush=True)
@@ -111,7 +115,7 @@ class BuildOutputProcessor:
         Precondition: no group is currently open (caller closed it if necessary).
         """
         stripped = line.strip()
-        first_match = re.search(r'\[(\d+)/(\d+)\]', stripped)
+        first_match = self.progress_regex.search(stripped)
         if first_match:
             group_name = f"Build progress [starting at {first_match.group(1)}/{first_match.group(2)}]"
         else:
@@ -176,7 +180,7 @@ class BuildOutputProcessor:
         If the target contains a colon (e.g. batteries:extraDep), it is treated
         as a non-file target and no filename is generated.
         """
-        match = re.search(r'\[(\d+)/(\d+)\]\s+(\S+)\s+([^\s]+)', line)
+        match = self.file_info_regex.search(line)
         if not match:
             return {}
 
