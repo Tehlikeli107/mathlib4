@@ -106,36 +106,57 @@ def annotate_strings(enumerate_lines):
 
 
 def four_spaces_in_second_line(lines, path):
-    # TODO: also fix the space for all lines before ":=", right now we only fix the line after
-    # the first line break
     errors = []
     # We never alter the first line, as it does not occur as next_line in the iteration over the
     # zipped lines below, hence we add it here
     newlines = [lines[0]]
     annotated_lines = list(annotate_comments(lines))
-    for (_, line, is_comment), (next_line_nr, next_line, _) in zip(annotated_lines,
+    in_header = False
+    for (_, line, is_comment), (next_line_nr, next_line, next_is_comment) in zip(annotated_lines,
                                                                    annotated_lines[1:]):
-        # Check if the current line matches "(lemma|theorem) .* :"
         new_next_line = next_line
+        # Check if the current line matches "(lemma|theorem) .* :"
         if (not is_comment) and re.search(r"^(protected )?(def|lemma|theorem) (?!.*:=).*(where)?$",
                                           line):
+            in_header = True
+
+        if in_header:
             # Calculate the number of spaces before the first non-space character in the next line
             stripped_next_line = next_line.lstrip()
-            if not (next_line == '\n' or next_line.startswith("#") or stripped_next_line.startswith("--")):
+            if not (next_line == '\n' or next_line.startswith("#") or next_is_comment):
                 num_spaces = len(next_line) - len(stripped_next_line)
-                # The match with "| " could potentially match with a different usage of the same
-                # symbol, e.g. some sort of norm. In that case a space is not necessary, so
-                # looking for "| " should be enough.
-                if stripped_next_line.startswith("| ") or line.endswith("where\n"):
-                    # Check and fix if the number of leading space is not 2
-                    if num_spaces != 2:
-                        errors += [(ERR_IND, next_line_nr, path)]
-                        new_next_line = ' ' * 2 + stripped_next_line
-                # Check and fix if the number of leading spaces is not 4
+
+                stripped_line = line.lstrip()
+                is_pipe = stripped_line.startswith("| ")
+                next_is_pipe = stripped_next_line.startswith("| ")
+
+                # We stop checking if we encounter a pipe but we are not in a pipe block
+                # (i.e. previous line was not a pipe).
+                if is_pipe and not next_is_pipe:
+                    in_header = False
+                    # Don't check this line (it's after the pipe block)
                 else:
-                    if num_spaces != 4:
-                        errors += [(ERR_IND, next_line_nr, path)]
-                        new_next_line = ' ' * 4 + stripped_next_line
+                    expect_two_spaces = next_is_pipe or line.endswith("where\n")
+
+                    if expect_two_spaces:
+                        # Check and fix if the number of leading space is not 2
+                        if num_spaces != 2:
+                            errors += [(ERR_IND, next_line_nr, path)]
+                            new_next_line = ' ' * 2 + stripped_next_line
+                    # Check and fix if the number of leading spaces is not 4
+                    else:
+                        if num_spaces != 4:
+                            errors += [(ERR_IND, next_line_nr, path)]
+                            new_next_line = ' ' * 4 + stripped_next_line
+
+                    if line.endswith("where\n"):
+                        # We just checked the first line of a where block. Stop.
+                        in_header = False
+                    if ":=" in next_line or next_line.endswith("where\n"):
+                        in_header = False
+                    if num_spaces == 0:
+                        in_header = False
+
         newlines.append((next_line_nr, new_next_line))
     return errors, newlines
 
@@ -184,6 +205,9 @@ def left_arrow_check(lines, path):
             errors += [(ERR_ARR, line_nr, path)]
         newlines.append((line_nr, new_line))
     return errors, newlines
+
+def nonterminal_simp_check(lines, path):
+    return [], lines
 
 def output_message(path, line_nr, code, msg):
     # We are outputting for github. We duplicate path, line_nr and code,
