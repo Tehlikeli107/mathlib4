@@ -661,6 +661,28 @@ def QueryType.desc : QueryType → String
   | commits => "hosted commits"
   | all     => "everything"
 
+/-- Extracts the content of the first occurrence of `tag` in `xml`. -/
+def extractTag (xml : String) (tag : String) : Option String :=
+  let openTag := s!"<{tag}>"
+  let closeTag := s!"</{tag}>"
+  match xml.splitOn openTag with
+  | _ :: contentAndRest :: _ =>
+    match contentAndRest.splitOn closeTag with
+    | content :: _ => some content
+    | _ => none
+  | _ => none
+
+def parseFilesInfo (xml : String) : IO (List (String × String)) := do
+  let parts := xml.splitOn "<Blob>"
+  match parts with
+  | [] => return []
+  | [_] => return []
+  | _ :: blobs =>
+    blobs.mapM fun blob => do
+      let some name := extractTag blob "Name" | formatError
+      let some date := extractTag blob "Last-Modified" | formatError
+      return (name, date)
+
 /--
 Retrieves metadata about hosted files: their names and the timestamps of last modification.
 
@@ -671,17 +693,7 @@ def getFilesInfo (q : QueryType) : IO <| List (String × String) := do
     throw <| .userError "FIXME: getFilesInfo is not adapted to Cloudflare cache yet"
   IO.println s!"Downloading info list of {q.desc}"
   let ret ← IO.runCurl #["-X", "GET", s!"{URL}?comp=list&restype=container{q.prefix}"]
-  match ret.splitOn "<Name>" with
-  | [] => formatError
-  | [_] => return []
-  | _ :: parts =>
-    parts.mapM fun part => match part.splitOn "</Name>" with
-      | [name, rest] => match rest.splitOn "<Last-Modified>" with
-        | [_, rest] => match rest.splitOn "</Last-Modified>" with
-          | [date, _] => pure (name, date)
-          | _ => formatError
-        | _ => formatError
-      | _ => formatError
+  parseFilesInfo ret
 
 end Collect
 
