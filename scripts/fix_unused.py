@@ -10,11 +10,11 @@ import sys
 
 # Parse warning messages and extract file paths, line, column, and variable names
 def parse_warnings(warning_lines):
-    pattern = r"warning: (\S+):(\d+):(\d+): unused variable `([^`]+)`"
+    pattern = re.compile(r"warning: (\S+):(\d+):(\d+): unused variable `([^`]+)`")
     warnings = []
 
     for line in warning_lines:
-        match = re.match(pattern, line)
+        match = pattern.match(line)
         if match:
             file_path, line_num, col_num, var_name = match.groups()
             warnings.append({
