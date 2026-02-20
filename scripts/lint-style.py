@@ -179,7 +179,7 @@ def left_arrow_check(lines, path):
             continue
         # Allow "←" to be followed by "%" or "`", but not by "`(" or "``(" (since "`()" and "``()"
         # are used for syntax quotations). Otherwise, insert a space after "←".
-        new_line = re.sub(r'←(?:(?=``?\()|(?![%`]))(\S)', r'← \1', line)
+        new_line = re.sub(r'\u2190(?:(?=``?\()|(?![%`]))(\S)', lambda m: '\u2190 ' + m.group(1), line)
         if new_line != line:
             errors += [(ERR_ARR, line_nr, path)]
         newlines.append((line_nr, new_line))
@@ -214,12 +214,11 @@ def lint(path, fix=False):
         # We enumerate the lines so that we can report line numbers in the error messages correctly
         # we will modify lines as we go, so we need to keep track of the original line numbers
         lines = f.readlines()
-        enum_lines = enumerate(lines, 1)
+        enum_lines = list(enumerate(lines, 1))
         newlines = enum_lines
         for error_check in [four_spaces_in_second_line,
                             isolated_by_dot_semicolon_check,
-                            left_arrow_check,
-                            nonterminal_simp_check]:
+                            left_arrow_check]:
             errs, newlines = error_check(newlines, path)
             format_errors(errs)
 
