@@ -6,17 +6,22 @@ import re
 import json
 
 # Usage:
-# python scripts/zulip_emoji_reactions.py $ZULIP_API_KEY $ZULIP_EMAIL $ZULIP_SITE $ACTION $LABEL_NAME $PR_NUMBER $LABELS_TO_KEEP
-# The first three variables identify the lean4 Zulip chat and allow the bot to access it
-# (see .github/workflows/zulip_emoji_merge_delegate.yaml),
-# see the comment below for a description of $ACTION and $LABEL_NAME.
-# $LABELS_TO_KEEP is optional, but if present, should be a JSON array of GitHub PR label names
+# python scripts/zulip_emoji_reactions.py $ACTION $LABEL_NAME $PR_NUMBER $LABELS_TO_KEEP
+# The environment variables ZULIP_API_KEY, ZULIP_EMAIL, and ZULIP_SITE identify the lean4 Zulip chat and allow the bot to access it
+# (see .github/workflows/zulip_emoji_merge_delegate.yaml).
+# See the comment below for a description of $ACTION and $LABEL_NAME.
+# $LABELS_TO_KEEP is optional, but if present, should be a JSON array of GitHub PR label names.
 # Emoji reactions that correspond to these labels will not be removed
-# (see .github/workflows/zulip_emoji_labelling.yaml)
+# (see .github/workflows/zulip_emoji_labelling.yaml).
 
-ZULIP_API_KEY = sys.argv[1]
-ZULIP_EMAIL = sys.argv[2]
-ZULIP_SITE = sys.argv[3]
+ZULIP_API_KEY = os.environ.get('ZULIP_API_KEY')
+ZULIP_EMAIL = os.environ.get('ZULIP_EMAIL')
+ZULIP_SITE = os.environ.get('ZULIP_SITE')
+
+if not ZULIP_API_KEY or not ZULIP_EMAIL or not ZULIP_SITE:
+    print("Error: ZULIP_API_KEY, ZULIP_EMAIL, and ZULIP_SITE must be set as environment variables.")
+    sys.exit(1)
+
 # Describes the "action" that is performed to the PR. Depending on which action calls this script,
 # this takes rather different values:
 # - if a PR is closed/reopened, it is 'closed' resp. 'reopened' (though the particular value for
@@ -30,17 +35,17 @@ ZULIP_SITE = sys.argv[3]
 #   Note that `bors d-` is *not* a bors command, so only has an effect on mathlib's PR labels.
 # - if CI status changed, it is 'ci-running', 'ci-success', 'ci-failure', or 'ci-cancelled'
 #   (see .github/workflows/zulip_emoji_ci_status.yaml)
-ACTION = sys.argv[4]
+ACTION = sys.argv[1]
 # Name of the label that was applied or removed
 # (if applicable; is 'none' if a PR was closed, reopened or merged)
-LABEL_NAME = sys.argv[5]
-PR_NUMBER = sys.argv[6]
+LABEL_NAME = sys.argv[2]
+PR_NUMBER = sys.argv[3]
 
 print(f"ACTION: '{ACTION}'")
 print(f"LABEL_NAME: '{LABEL_NAME}'")
 print(f"PR_NUMBER: '{PR_NUMBER}'")
 try:
-    LABELS_TO_KEEP = sys.argv[7]
+    LABELS_TO_KEEP = sys.argv[4]
     print(f"Attempting to parse LABELS_TO_KEEP: '{LABELS_TO_KEEP}")
     LABELS_TO_KEEP = json.loads(LABELS_TO_KEEP)
     assert isinstance(LABELS_TO_KEEP, list)
