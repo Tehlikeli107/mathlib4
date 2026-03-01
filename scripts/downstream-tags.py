@@ -9,6 +9,8 @@ import json
 import base64
 import shutil
 
+VERSION_PATTERN = re.compile(r'v4\.\d+\.\d+(?:-rc\d+)?$')
+
 # Unicode symbols
 TICK = "✅"   # Check mark button
 CROSS = "❌"  # Cross mark
@@ -65,13 +67,12 @@ def get_latest_version(repo: Dict[str, str]) -> Optional[str]:
         tags = json.loads(result.stdout)
 
         # Extract tag names and filter for version tags
-        version_pattern = re.compile(r'v4\.\d+\.\d+(?:-rc\d+)?$')
         version_tags = []
 
         for tag in tags:
             ref = tag['ref']
             tag_name = ref.replace('refs/tags/', '')
-            if version_pattern.match(tag_name):
+            if VERSION_PATTERN.match(tag_name):
                 version_tags.append(tag_name)
 
         if not version_tags:
