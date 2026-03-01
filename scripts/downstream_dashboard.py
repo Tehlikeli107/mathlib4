@@ -18,6 +18,7 @@ import json
 import base64
 import shutil
 import argparse
+import concurrent.futures
 
 # Unicode symbols
 # We don't want to enforce that every project is set up the same,
@@ -188,12 +189,18 @@ def workflow_actions(workflow: Dict) -> Iterator[str]:
             except KeyError:
                 continue
 
-def check_workflow_uses_action(repo: Dict[str, str], workflow_name: str, expected_action: str, silent=False) -> bool:
+def check_workflow_uses_action(repo: Dict[str, str], workflow_name: str, expected_action: str, output: Optional[List[str]] = None, silent=False) -> bool:
     """Check that the repository has a workflow for running the indicated CI job,
     and that this workflow invokes the indicated action.
 
-    Will print its findings to stdout, unless `silent=True` is passed.
+    Will print its findings to stdout (or append to `output` list if provided), unless `silent=True` is passed.
     """
+
+    def log(msg):
+        if output is not None:
+            output.append(msg)
+        else:
+            print(msg)
 
     try:
         workflow_filename = repo['workflows'][workflow_name]
@@ -203,7 +210,7 @@ def check_workflow_uses_action(repo: Dict[str, str], workflow_name: str, expecte
             existing_workflows = repo.get('workflows', {})
             example_entry = {**repo, 'workflows': {**existing_workflows, workflow_name: f'{workflow_name}.yml'}}
             yaml_example_entry = yaml.dump(example_entry)
-            print(
+            log(
 f"""  {FAIL} Consider adding a {workflow_name} workflow.
     See https://github.com/{expected_action}/blob/HEAD/README.md for installation instructions.
     After installing a workflow, please add an entry to `scripts/downstream_repos.yml` in Mathlib.
@@ -216,7 +223,7 @@ f"""  {FAIL} Consider adding a {workflow_name} workflow.
     workflow_contents = fetch_file_contents(repo, workflow_path)
     if workflow_contents is None:
         if not silent:
-            print(
+            log(
 f"""  {FAIL} Workflow {workflow_name}, file `{workflow_filename}` could not be fetched.
     Please ensure Mathlib's `scripts/downstream_repos.yml` refers to the correct file name (of the form `{workflow_name}.yml`).""")
         return False
@@ -224,7 +231,7 @@ f"""  {FAIL} Workflow {workflow_name}, file `{workflow_filename}` could not be f
         workflow = yaml.safe_load(workflow_contents)
     except Exception:
         if not silent:
-            print(
+            log(
 f"""  {FAIL} Workflow {workflow_name} defined in `scripts/downstream_repos.yml` could not be parsed.
     Please ensure Mathlib's `scripts/downstream_repos.yml` refers to the correct file name (of the form `{workflow_name}.yml`).""")
         return False
@@ -232,11 +239,11 @@ f"""  {FAIL} Workflow {workflow_name} defined in `scripts/downstream_repos.yml` 
     action_references = set(action.split('@')[0] for action in workflow_actions(workflow))
     if expected_action in action_references:
         if not silent:
-            print(f"  {PASS} Detected workflow {workflow_name}, using the action: {expected_action}")
+            log(f"  {PASS} Detected workflow {workflow_name}, using the action: {expected_action}")
         return True
     else:
         if not silent:
-            print(
+            log(
 f"""  {WARN} Detected a workflow {workflow_name} set up by hand.
     A GitHub Action exists to handle this workflow for you.
     See https://github.com/{expected_action}/blob/HEAD/README.md for installation instructions.""")
@@ -345,23 +352,27 @@ def main():
 
     if single_feature_mode:
         # Single feature mode: only show repos missing the specified feature
-        missing_repos = []
-
-        for repo in repos:
+        def check_repo_single(repo):
             if args.lean_release_tag and not check_release_tag(repo):
-                missing_repos.append(repo)
+                return repo
             elif args.lean_action and not check_build_action(repo):
-                missing_repos.append(repo)
+                return repo
             elif args.docgen_action and not check_docs_action(repo):
-                missing_repos.append(repo)
+                return repo
             elif args.update_action and not check_update_action(repo):
-                missing_repos.append(repo)
+                return repo
             elif args.license and not check_license(repo):
-                missing_repos.append(repo)
+                return repo
             elif args.lint and not check_lint_driver(repo):
-                missing_repos.append(repo)
+                return repo
             elif args.test and not check_test_driver(repo):
-                missing_repos.append(repo)
+                return repo
+            return None
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            results = list(executor.map(check_repo_single, repos))
+
+        missing_repos = [r for r in results if r is not None]
 
         if missing_repos:
             # Determine the feature name and action URL
@@ -404,42 +415,44 @@ def main():
         print("Checking downstream repository setup")
         print("-" * 50)
 
-        success = True
-        for repo in repos:
-            print(f"\nRepository {repo['name']}")
+        def process_repo(repo):
+            output = []
+            repo_success = True
+
+            output.append(f"\nRepository {repo['name']}")
             if 'zulip-contact' in repo:
-                print(f"  Contact: @**{repo['zulip-contact']}**")
+                output.append(f"  Contact: @**{repo['zulip-contact']}**")
 
             # Check toolchain versions.
             latest = get_latest_version(repo)
             if latest:
-                print(f"  {PASS} Latest toolchain tag: {latest}")
+                output.append(f"  {PASS} Latest toolchain tag: {latest}")
             else:
-                success = False
+                repo_success = False
                 current = get_current_toolchain(repo)
-                print(
+                output.append(
 f"""  {FAIL} No toolchain tags found.
     Adding a tag for new releases helps users of your project to synchronize versions.
     A GitHub Action exists to handle tagging new releases for you.
     See https://github.com/leanprover-community/lean-release-tag/blob/HEAD/README.md for installation instructions.""")
 
-            success = check_workflow_uses_action(repo, 'build', 'leanprover/lean-action') and success
-            success = check_workflow_uses_action(repo, 'docs', 'leanprover-community/docgen-action') and success
-            success = check_workflow_uses_action(repo, 'release-tag', 'leanprover-community/lean-release-tag') and success
+            repo_success = check_workflow_uses_action(repo, 'build', 'leanprover/lean-action', output) and repo_success
+            repo_success = check_workflow_uses_action(repo, 'docs', 'leanprover-community/docgen-action', output) and repo_success
+            repo_success = check_workflow_uses_action(repo, 'release-tag', 'leanprover-community/lean-release-tag', output) and repo_success
             # We have two actions that can do auto-updating; handle these checks manually.
-            if check_workflow_uses_action(repo, 'update', 'leanprover-community/lean-update', silent=True):
-                print(f"  {PASS} Update workflow installed, using the action: leanprover-community/lean-update")
+            if check_workflow_uses_action(repo, 'update', 'leanprover-community/lean-update', output, silent=True):
+                output.append(f"  {PASS} Update workflow installed, using the action: leanprover-community/lean-update")
             else:
                 # Report failure for mathlib-update-action, since that has more features.
-                success = check_workflow_uses_action(repo, 'update', 'leanprover-community/mathlib-update-action') and success
+                repo_success = check_workflow_uses_action(repo, 'update', 'leanprover-community/mathlib-update-action', output) and repo_success
 
             license = fetch_license(repo)
             if license is not None:
                 first_line = license.split('\n')[0].strip()
-                print(f"  {PASS} License: {first_line}")
+                output.append(f"  {PASS} License: {first_line}")
             else:
-                success = False
-                print(
+                repo_success = False
+                output.append(
 f"""  {FAIL} Consider adding a license.
     Choosing a license for your project makes it open-source and encourages contribution and reuse.
     Lean and Mathlib are open-source projects available under the Apache License 2.0: https://choosealicense.com/licenses/apache-2.0/
@@ -453,33 +466,42 @@ f"""  {FAIL} Consider adding a license.
                 lakefile_format = 'toml'
                 lakefile = fetch_file_contents(repo, 'lakefile.toml')
                 if lakefile is None:
-                    success = False
-                    print(
+                    repo_success = False
+                    output.append(
 f"""  {FAIL} No lakefile found.
     This may be caused by a temporary network error. Try running the script again.""")
-                    continue
+                    return repo_success, '\n'.join(output)
             # We're not going to parse the whole lakefile to check for these options.
             if 'lintDriver' in lakefile or 'lint_driver' in lakefile:
-                print(f"  {PASS} Linting enabled.")
+                output.append(f"  {PASS} Linting enabled.")
             else:
-                success = False
-                print(
+                repo_success = False
+                output.append(
 f"""  {FAIL} Consider adding a lint driver.
     You can configure the `lake lint` command to automatically report code quality suggestions.
     Linters are included with Mathlib or Batteries.
     For instructions on enabling a linter, please see: https://github.com/leanprover-community/mathlib4/wiki/Setting-up-linting-and-testing-for-your-Lean-project#adding-a-linter""")
             if 'linter.mathlibStandard' in lakefile:
                 # These linter options are quite strict, so don't complain if they are not enabled.
-                print(f"  {PASS} Linting to Mathlib's standards.")
+                output.append(f"  {PASS} Linting to Mathlib's standards.")
             if 'testDriver' in lakefile or 'test_driver' in lakefile:
-                print(f"  {PASS} Testing enabled.")
+                output.append(f"  {PASS} Testing enabled.")
             else:
-                success = False
+                repo_success = False
                 # A warning, since a lot of projects seem to be their own test-suite.
-                print(
+                output.append(
 f"""  {WARN} Consider adding a test driver.
     You can configure the `lake test` command to build and run test files.
     For instructions on creating a test suite, please see: https://github.com/leanprover-community/mathlib4/wiki/Setting-up-linting-and-testing-for-your-Lean-project#adding-a-test-driver""")
+
+            return repo_success, '\n'.join(output)
+
+        success = True
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            results = list(executor.map(process_repo, repos))
+            for repo_success, out_str in results:
+                print(out_str)
+                success = success and repo_success
 
         sys.exit(0 if success else 1)
 
