@@ -99,4 +99,4 @@ jobs:
         ZULIP_EMAIL: github-mathlib4-bot@leanprover.zulipchat.com
         ZULIP_SITE: https://leanprover.zulipchat.com
       run: |
-        python scripts/zulip_emoji_reactions.py "$ZULIP_API_KEY" "$ZULIP_EMAIL" "$ZULIP_SITE" "${{ steps.action.outputs.ci_action }}" "none" "${{ steps.pr.outputs.pr_number }}"
+        python scripts/zulip_emoji_reactions.py "${{ steps.action.outputs.ci_action }}" "none" "${{ steps.pr.outputs.pr_number }}"
