@@ -280,11 +280,34 @@ variable {g : M → E}
 /-- info: MDifferentiableOn I 𝓘(𝕜, E) g s : Prop -/
 #guard_msgs in
 #check MDiff[s] g
--- TODO: fix and enable! #check MDiff[s] g m
+
+/--
+error: Function expected at
+  MDifferentiableOn I 𝓘(𝕜, E) g s
+but this term has type
+  Prop
+
+Note: Expected a function because this term is being applied to the argument
+  m
+-/
+#guard_msgs in
+#check MDiff[s] g m
+
 /-- info: MDifferentiable I 𝓘(𝕜, E) g : Prop -/
 #guard_msgs in
 #check MDiff g
--- TODO: fix and enable! #check MDiff g m
+
+/--
+error: Function expected at
+  MDifferentiable I 𝓘(𝕜, E) g
+but this term has type
+  Prop
+
+Note: Expected a function because this term is being applied to the argument
+  m
+-/
+#guard_msgs in
+#check MDiff g m
 
 -- From a manifold into a field.
 variable {h : M → 𝕜}
@@ -304,11 +327,34 @@ variable {h : M → 𝕜}
 /-- info: MDifferentiableOn I 𝓘(𝕜, 𝕜) h s : Prop -/
 #guard_msgs in
 #check MDiff[s] h
--- TODO: fix and enable! #check MDiff[s] h m
+
+/--
+error: Function expected at
+  MDifferentiableOn I 𝓘(𝕜, 𝕜) h s
+but this term has type
+  Prop
+
+Note: Expected a function because this term is being applied to the argument
+  m
+-/
+#guard_msgs in
+#check MDiff[s] h m
+
 /-- info: MDifferentiable I 𝓘(𝕜, 𝕜) h : Prop -/
 #guard_msgs in
 #check MDiff h
--- TODO: fix and enable! #check MDiff h m
+
+/--
+error: Function expected at
+  MDifferentiable I 𝓘(𝕜, 𝕜) h
+but this term has type
+  Prop
+
+Note: Expected a function because this term is being applied to the argument
+  m
+-/
+#guard_msgs in
+#check MDiff h m
 
 -- The following tests are more spotty, as most code paths are already covered above.
 -- Add further details as necessary.
@@ -321,12 +367,34 @@ variable {f : E → M'} {s : Set E} {x : E}
 /-- info: MDifferentiableAt 𝓘(𝕜, E) I' f x : Prop -/
 #guard_msgs in
 #check MDiffAt f x
--- TODO: fix and enable! #check MDiff[s] f x
+
+/--
+error: Function expected at
+  MDifferentiableOn 𝓘(𝕜, E) I' f s
+but this term has type
+  Prop
+
+Note: Expected a function because this term is being applied to the argument
+  x
+-/
+#guard_msgs in
+#check MDiff[s] f x
+
 /-- info: MDifferentiable 𝓘(𝕜, E) I' f : Prop -/
 #guard_msgs in
 #check MDiff f
--- TODO: should this error? if not, fix and enable! #check MDiff f x
--- same! #check MDifferentiable% f x
+
+/--
+error: Function expected at
+  MDifferentiable 𝓘(𝕜, E) I' f
+but this term has type
+  Prop
+
+Note: Expected a function because this term is being applied to the argument
+  x
+-/
+#guard_msgs in
+#check MDiff f x
 
 -- Between normed spaces.
 variable {f : E → E'} {s : Set E} {x : E}
@@ -812,11 +880,34 @@ variable {g : M → E}
 /-- info: ContMDiffOn I 𝓘(𝕜, E) n g s : Prop -/
 #guard_msgs in
 #check CMDiff[s] n g
--- TODO: fix and enable! #check CMDiff[s] n g m
+
+/--
+error: Function expected at
+  ContMDiffOn I 𝓘(𝕜, E) n g s
+but this term has type
+  Prop
+
+Note: Expected a function because this term is being applied to the argument
+  m
+-/
+#guard_msgs in
+#check CMDiff[s] n g m
+
 /-- info: ContMDiff I 𝓘(𝕜, E) n g : Prop -/
 #guard_msgs in
 #check CMDiff n g
--- TODO: fix and enable! #check CMDiff n g m
+
+/--
+error: Function expected at
+  ContMDiff I 𝓘(𝕜, E) n g
+but this term has type
+  Prop
+
+Note: Expected a function because this term is being applied to the argument
+  m
+-/
+#guard_msgs in
+#check CMDiff n g m
 
 -- From a manifold into a field.
 variable {h : M → 𝕜}
@@ -836,11 +927,34 @@ variable {h : M → 𝕜}
 /-- info: ContMDiffOn I 𝓘(𝕜, 𝕜) n h s : Prop -/
 #guard_msgs in
 #check CMDiff[s] n h
--- TODO: fix and enable! #check CMDiff[s] n h m
+
+/--
+error: Function expected at
+  ContMDiffOn I 𝓘(𝕜, 𝕜) n h s
+but this term has type
+  Prop
+
+Note: Expected a function because this term is being applied to the argument
+  m
+-/
+#guard_msgs in
+#check CMDiff[s] n h m
+
 /-- info: ContMDiff I 𝓘(𝕜, 𝕜) 37 h : Prop -/
 #guard_msgs in
 #check CMDiff 37 h
--- TODO: fix and enable! #check CMDiff 0 h m
+
+/--
+error: Function expected at
+  ContMDiff I 𝓘(𝕜, 𝕜) 0 h
+but this term has type
+  Prop
+
+Note: Expected a function because this term is being applied to the argument
+  m
+-/
+#guard_msgs in
+#check CMDiff 0 h m
 
 -- The following tests are more spotty, as most code paths are already covered above.
 -- Add further details as necessary.
@@ -854,12 +968,34 @@ variable {f : E → M'} {s : Set E} {x : E}
 /-- info: ContMDiffAt 𝓘(𝕜, E) I' 3 f x : Prop -/
 #guard_msgs in
 #check CMDiffAt 3 f x
--- TODO: fix and enable! #check CMDiff[s] 1 f x
+
+/--
+error: Function expected at
+  ContMDiffOn 𝓘(𝕜, E) I' 1 f s
+but this term has type
+  Prop
+
+Note: Expected a function because this term is being applied to the argument
+  x
+-/
+#guard_msgs in
+#check CMDiff[s] 1 f x
+
 /-- info: ContMDiff 𝓘(𝕜, E) I' 1 f : Prop -/
 #guard_msgs in
 #check CMDiff 1 f
--- TODO: should this error? if not, fix and enable! #check CMDiff 1 f x
--- same! #check MDifferentiable% f x
+
+/--
+error: Function expected at
+  ContMDiff 𝓘(𝕜, E) I' 1 f
+but this term has type
+  Prop
+
+Note: Expected a function because this term is being applied to the argument
+  x
+-/
+#guard_msgs in
+#check CMDiff 1 f x
 
 -- Between normed spaces.
 variable {f : E → E'} {s : Set E} {x : E}
