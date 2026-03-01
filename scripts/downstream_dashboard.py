@@ -27,6 +27,8 @@ PASS = "✅" # Success: check mark button
 WARN = "💡" # Warning: lightbulb
 FAIL = "🛠️" # Failure: work in progress
 
+VERSION_PATTERN = re.compile(r'v4\.\d+\.\d+(?:-rc\d+)?$')
+
 def check_gh_installed():
     """Check if GitHub CLI (gh) is installed and accessible"""
     if not shutil.which('gh'):
@@ -79,13 +81,12 @@ def get_latest_version(repo: Dict[str, str]) -> Optional[str]:
         tags = json.loads(result.stdout)
 
         # Extract tag names and filter for version tags
-        version_pattern = re.compile(r'v4\.\d+\.\d+(?:-rc\d+)?$')
         version_tags = []
 
         for tag in tags:
             ref = tag['ref']
             tag_name = ref.replace('refs/tags/', '')
-            if version_pattern.match(tag_name):
+            if VERSION_PATTERN.match(tag_name):
                 version_tags.append(tag_name)
 
         if not version_tags:
