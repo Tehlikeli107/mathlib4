@@ -208,13 +208,45 @@ theorem IsIso.of_epi_section {X Y : C} (f : X ⟶ Y) [hf : IsSplitEpi f] [hf' : 
 
 -- FIXME this has unnecessarily become noncomputable!
 /-- A category where every morphism has a `Trunc` retraction is computably a groupoid. -/
-noncomputable def Groupoid.ofTruncSplitMono
-    (all_split_mono : ∀ {X Y : C} (f : X ⟶ Y), Trunc (IsSplitMono f)) : Groupoid.{v₁} C := by
-  apply Groupoid.ofIsIso
-  intro X Y f
-  have ⟨a,_⟩ := Trunc.exists_rep <| all_split_mono f
-  have ⟨b,_⟩ := Trunc.exists_rep <| all_split_mono <| retraction f
-  apply IsIso.of_mono_retraction
+def Groupoid.ofTruncSplitMono
+    (all_split_mono : ∀ {X Y : C} (f : X ⟶ Y), Trunc (SplitMono f)) : Groupoid.{v₁} C where
+  inv f := Trunc.lift (fun sm => sm.retraction)
+    (fun sm1 sm2 => by
+      have h_epi : Epi f := by
+        apply Epi.mk
+        intro Z g h H
+        let r := sm1.retraction
+        have h_r : f ≫ r = 𝟙 _ := sm1.id
+        induction all_split_mono r using Trunc.induction_on with
+        | h sm_r =>
+          let s := sm_r.retraction
+          have h_s : r ≫ s = 𝟙 _ := sm_r.id
+          have s_eq_f : s = f := by
+            rw [← Category.id_comp s, ← h_r, Category.assoc, h_s, Category.comp_id]
+          rw [s_eq_f] at h_s
+          rw [← Category.id_comp g, ← Category.id_comp h, ← h_s, Category.assoc, Category.assoc, H]
+      apply (cancel_epi f).1
+      rw [sm1.id, sm2.id])
+    (all_split_mono f)
+  inv_comp f := by
+    induction all_split_mono f using Trunc.induction_on with
+    | h sm =>
+      change sm.retraction ≫ f = 𝟙 _
+      let r := sm.retraction
+      have h_r : f ≫ r = 𝟙 _ := sm.id
+      induction all_split_mono r using Trunc.induction_on with
+      | h sm_r =>
+        let s := sm_r.retraction
+        have h_s : r ≫ s = 𝟙 _ := sm_r.id
+        have s_eq_f : s = f := by
+          rw [← Category.id_comp s, ← h_r, Category.assoc, h_s, Category.comp_id]
+        rw [s_eq_f] at h_s
+        exact h_s
+  comp_inv f := by
+    induction all_split_mono f using Trunc.induction_on with
+    | h sm =>
+      change f ≫ sm.retraction = 𝟙 _
+      exact sm.id
 
 section
 
