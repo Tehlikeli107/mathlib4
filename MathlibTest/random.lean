@@ -4,8 +4,6 @@ import Batteries.Lean.LawfulMonad
 
 open Random
 
--- TODO(kmill): remove once the mathlib ToExpr Int instance is removed
-set_option eval.pp false
 
 section Rand
 
