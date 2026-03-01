@@ -159,10 +159,7 @@ variable {α : Type*} [CircularPreorder α]
 theorem btw_rfl {a : α} : btw a a a :=
   btw_refl _
 
--- TODO: `alias` creates a def instead of a lemma (because `btw_cyclic_left` is a def).
--- alias btw_cyclic_left        ← Btw.btw.cyclic_left
-theorem Btw.btw.cyclic_left {a b c : α} (h : btw a b c) : btw b c a :=
-  btw_cyclic_left h
+alias Btw.btw.cyclic_left := btw_cyclic_left
 
 theorem btw_cyclic_right {a b c : α} (h : btw a b c) : btw c a b :=
   h.cyclic_left.cyclic_left
@@ -211,10 +208,7 @@ alias SBtw.sbtw.cyclic_right := sbtw_cyclic_right
 theorem sbtw_cyclic {a b c : α} : sbtw a b c ↔ sbtw c a b :=
   ⟨sbtw_cyclic_right, sbtw_cyclic_left⟩
 
--- TODO: `alias` creates a def instead of a lemma (because `sbtw_trans_left` is a def).
--- alias btw_trans_left        ← SBtw.sbtw.trans_left
-theorem SBtw.sbtw.trans_left {a b c d : α} (h : sbtw a b c) : sbtw b d c → sbtw a d c :=
-  sbtw_trans_left h
+alias SBtw.sbtw.trans_left := sbtw_trans_left
 
 theorem sbtw_trans_right {a b c d : α} (hbc : sbtw a b c) (hcd : sbtw a c d) : sbtw a b d :=
   (hbc.cyclic_left.trans_left hcd.cyclic_left).cyclic_right
@@ -244,10 +238,7 @@ section CircularPartialOrder
 
 variable {α : Type*} [CircularPartialOrder α]
 
--- TODO: `alias` creates a def instead of a lemma (because `btw_antisymm` is a def).
--- alias btw_antisymm        ← Btw.btw.antisymm
-theorem Btw.btw.antisymm {a b c : α} (h : btw a b c) : btw c b a → a = b ∨ b = c ∨ c = a :=
-  btw_antisymm h
+alias Btw.btw.antisymm := btw_antisymm
 
 end CircularPartialOrder
 
