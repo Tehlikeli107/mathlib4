@@ -10,6 +10,8 @@ import re
 import json
 import sys
 
+import_re = re.compile(r'^(public )?import\s+(?P<ref>.*)')
+
 def get_imports(directory):
     # Initialize an empty dictionary
     file_imports = {}
@@ -32,7 +34,7 @@ def get_imports(directory):
                         if '/-!' in line:
                             break
                         # Find an import statement
-                        match = re.match(r'^(public )?import\s+(?P<ref>.*)', line)
+                        match = import_re.match(line)
                         if match:
                             imports.append(match.groupdict()['ref'])
 
