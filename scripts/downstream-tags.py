@@ -8,6 +8,7 @@ from typing import List, Dict, Optional
 import json
 import base64
 import shutil
+import concurrent.futures
 
 # Unicode symbols
 TICK = "✅"   # Check mark button
@@ -216,13 +217,24 @@ def main():
         print("-" * 50)
 
         all_exist = True
-        for repo in repos:
+
+        def process_repo(repo):
             exists = check_tag(repo, tag)
+            commit = None
+            if not exists:
+                commit = check_toolchain_history(repo, tag)
+            return repo, exists, commit
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            # Map returns results in the order of iterables
+            results = executor.map(process_repo, repos)
+
+        for repo, exists, commit in results:
             status = TICK if exists else CROSS
             print(f"{status} {repo['name']}")
             if not exists:
                 all_exist = False
-                if commit := check_toolchain_history(repo, tag):
+                if commit:
                     print("    - There is a commit which uses this toolchain. You can tag it using:")
                     print(f"    gh api repos/{repo['github'].replace('https://github.com/', '')}/git/refs "
                           f"-X POST -F ref=refs/tags/{tag} -F sha={commit}")
