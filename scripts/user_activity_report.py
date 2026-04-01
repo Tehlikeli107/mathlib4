@@ -34,6 +34,8 @@ import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 # Get cache directory following XDG Base Directory Specification
 cache_home = os.environ.get('XDG_CACHE_HOME')
@@ -386,28 +388,40 @@ def main():
     # Get last commit for each user
     user_commits = []
 
-    for i, user in enumerate(users, 1):
+    cache_lock = Lock()
+
+    def process_user(i: int, user: Dict, total_users: int) -> Dict:
         username = user['login']
 
         # Check cache first - distinguish between "not cached" vs "cached as None"
         if username in cached_commits:
             last_commit_date = cached_commits[username]
-            print(f"Using cached data for {username} ({i}/{len(users)})...")
+            print(f"Using cached data for {username} ({i}/{total_users})...")
         else:
-            print(f"Fetching commits for {username} ({i}/{len(users)})...")
+            print(f"Fetching commits for {username} ({i}/{total_users})...")
             last_commit_date = get_last_commit_for_user(owner, repo, username)
-            cached_commits[username] = last_commit_date
-            # Save cache after each new lookup
-            save_commits_cache(owner, repo, cached_commits)
+            with cache_lock:
+                cached_commits[username] = last_commit_date
+                # Save cache after each new lookup
+                save_commits_cache(owner, repo, cached_commits)
 
         permission_level = get_permission_level(user)
 
-        user_commits.append({
+        return {
             'username': username,
             'last_commit_date': last_commit_date,
             'permission_level': permission_level,
             'profile_url': user['html_url']
-        })
+        }
+
+    # Process users in parallel using ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = []
+        for i, user in enumerate(users, 1):
+            futures.append(executor.submit(process_user, i, user, len(users)))
+
+        for future in as_completed(futures):
+            user_commits.append(future.result())
 
     # Sort by last commit date (most recent first, then never committed)
     def sort_key(user_data):
