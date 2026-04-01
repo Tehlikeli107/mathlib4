@@ -148,6 +148,9 @@ def parse_version_tag(tag: str) -> Optional[VersionTag]:
         v4.24.0-rc1 -> VersionTag(major=4, minor=24, patch=0, rc=1, patch_suffix=None)
         v4.24.1-patch1 -> VersionTag(major=4, minor=24, patch=1, rc=None, patch_suffix=1)
     """
+    if tag is None:
+        return None
+
     match = VERSION_TAG_PATTERN.match(tag)
     if not match:
         return None
