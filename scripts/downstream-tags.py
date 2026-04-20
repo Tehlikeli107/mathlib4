@@ -8,6 +8,7 @@ from typing import List, Dict, Optional
 import json
 import base64
 import shutil
+import concurrent.futures
 
 # Unicode symbols
 TICK = "✅"   # Check mark button
@@ -157,17 +158,22 @@ def main():
 
     if len(sys.argv) == 1:
         # Collect data with progress spinner
-        repo_data = []
-        total = len(repos)
-        for i, repo in enumerate(repos, 1):
-            print(f"\rCollecting data: {i}/{total}", end='', flush=True)
-            latest = get_latest_version(repo)
-            current = get_current_toolchain(repo)
-            repo_data.append({
+        def fetch_repo_data(repo):
+            return {
                 'repo': repo,
-                'latest': latest,
-                'current': current
-            })
+                'latest': get_latest_version(repo),
+                'current': get_current_toolchain(repo)
+            }
+
+        total = len(repos)
+        repo_data = [None] * total
+        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+            futures = {executor.submit(fetch_repo_data, repo): i for i, repo in enumerate(repos)}
+            completed = 0
+            for future in concurrent.futures.as_completed(futures):
+                completed += 1
+                print(f"\rCollecting data: {completed}/{total}", end='', flush=True)
+                repo_data[futures[future]] = future.result()
         print()  # New line after spinner
 
         # Group repos by toolchain version
@@ -215,14 +221,26 @@ def main():
         print(f"Checking for tag {tag} in downstream repositories:")
         print("-" * 50)
 
-        all_exist = True
-        for repo in repos:
+        def check_repo_tag(repo, tag):
             exists = check_tag(repo, tag)
+            if not exists:
+                commit = check_toolchain_history(repo, tag)
+                return repo, exists, commit
+            return repo, exists, None
+
+        all_exist = True
+        results = [None] * len(repos)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+            futures = {executor.submit(check_repo_tag, repo, tag): i for i, repo in enumerate(repos)}
+            for future in concurrent.futures.as_completed(futures):
+                results[futures[future]] = future.result()
+
+        for repo, exists, commit in results:
             status = TICK if exists else CROSS
             print(f"{status} {repo['name']}")
             if not exists:
                 all_exist = False
-                if commit := check_toolchain_history(repo, tag):
+                if commit:
                     print("    - There is a commit which uses this toolchain. You can tag it using:")
                     print(f"    gh api repos/{repo['github'].replace('https://github.com/', '')}/git/refs "
                           f"-X POST -F ref=refs/tags/{tag} -F sha={commit}")
